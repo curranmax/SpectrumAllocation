@@ -1,0 +1,112 @@
+
+#include "args.h"
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <stdlib.h>
+#include <string.h>
+
+Args::Args(const int &argc, char const *argv[]) {
+	// Checks for a '-config' flag
+	std::string config_file = "";
+	for(int i = 1; i < argc; ++i) {
+		if(strcmp(argv[i], "-config") == 0 && i + 1 < argc) {
+			config_file = argv[i + 1];
+			break;
+		}
+	}
+
+	std::vector<std::string> cmd_args;
+	if(config_file != "") {
+		std::ifstream ifstr(config_file, std::ifstream::in);
+		std::string token = "";
+
+		while(ifstr >> token) {
+			cmd_args.push_back(token);
+		}
+	}
+	for(int i = 1; i < argc; ++i) {
+		if(strcmp(argv[i], "-config") == 0 && i + 1 < argc) {
+			++i;
+			continue;
+		}
+		cmd_args.push_back(argv[i]);
+	}
+
+	// Initialize arguments and their flags
+	args = {Arg_Val(&rand_seed, 0, "-rand_seed", "RAND_SEED", "Value to seed RNG with."),
+			Arg_Val(&brief_out, "-brief_out", "If given, only outputs minimal info."),
+			Arg_Val(&num_pu, 1, "-npu", "NUM_PU", "Number of Primary Users to generate."),
+			Arg_Val(&num_ss, 1, "-nss", "NUM_SS", "Number of Spectrum Sensors to generate."),
+			Arg_Val(&num_su, 1, "-nsu", "NUM_SU", "Number of Secondary Users to generate."),
+			Arg_Val(&location_range, 100.0, "-lr", "LOC_RANGE", "Range of locations entities will be placed"),
+			Arg_Val(&propagation_model, "log_distance", "-pm", "PROPAGATION_MODEL", "Ground truth Propagation Model to use"),
+			Arg_Val(&ld_path_loss0, 1.0, "-ld_pl0", "REFERENCE_PATH_LOSS", "For Log-Distance PM, the reference path loss (in dBm)"),
+			Arg_Val(&ld_dist0, 5.0, "-ld_d0", "REFERENCE_DISTANCE", "For Log-Distance PM, the reference distance."),
+			Arg_Val(&ld_gamma, 1.0, "-ld_g", "LD_GAMMA", "For Log-Distance PM, the gamma parameter."),
+			Arg_Val(&num_ss_selection, 0, "-nss_s", "NUM_SS_SELECTION", "For each SU request, uses only the specified number of nearby SS. A value of 0 uses all SS."),
+			Arg_Val(&ss_receive_power_alpha, 1.0, "-rpa", "RECEIVE_POWER_ALPHA", "Parameter used when estimated the received power from PUs at SSs"),
+			Arg_Val(&path_loss_alpha, 1.0, "-pla", "PATH_LOSS_ALPHA", "Parameter used when estimating the path loss between PRs and SUs."),
+			Arg_Val(&num_float_bits, 16, "-float_bits", "NUM_FLOAT_BITS", "Number of bits of precision to use during the S2-PC calculations."),
+			Arg_Val(&s2_pc_bit_count, 64, "-bit_count", "BIT_COUNT", "Number of total bits to use in S2-PC calculations.")
+		};
+
+	for(unsigned int i = 0; i < cmd_args.size(); ++i) {
+		if(cmd_args[i] == "-h" || cmd_args[i] == "-help") {
+			printHelp();
+		}
+		bool match_found = false;
+		for(unsigned int j = 0; j < args.size(); ++j) {
+			if(args[j].isMatch(cmd_args, i)) {
+				args[j].setVal(cmd_args, i);
+				match_found = true;
+				break;
+			}
+		}
+		// IF NONE FOUND PRINT AN ERROR MESSAGE
+		if(!match_found) {
+			std::cerr << "INVALID COMMAND LINE ARG: " << cmd_args[i] << std::endl;
+		}
+	}
+}
+
+void Args::printHelp() const {
+	for(unsigned int i = 0; i < args.size(); ++i) {
+		std::cout << " " << args[i].flag_str << " " << args[i].input_name << std::endl;
+		std::cout << "    " << args[i].help_text << std::endl << std::endl;
+	}
+
+	// Prints the -config flag
+	std::cout << " -config CONFIG_FILE" << std::endl;
+	std::cout << "    Config file containing flags. Command line flags override values in config file." << std::endl;
+	exit(0);
+}
+
+bool Args::Arg_Val::isMatch(const std::vector<std::string> &cmd_args, unsigned int &i) {
+	if(cmd_args[i] == flag_str) {
+		if(val_type == "f" || val_type == "i" || val_type == "s") {
+			if(i >= cmd_args.size() - 1) {
+				return false;
+			}
+			i++;
+		}
+		return true;
+	}
+	return false;
+}
+
+void Args::Arg_Val::setVal(const std::vector<std::string> &cmd_args, unsigned int &i) {
+	if(val_type == "f") {
+		*((float*) val_ptr) = atof(cmd_args[i].c_str());
+	}
+	if(val_type == "i") {
+		*((int*) val_ptr) = atoi(cmd_args[i].c_str());
+	}
+	if(val_type == "s") {
+		*((std::string*) val_ptr) = cmd_args[i];
+	}
+	if(val_type == "b") {
+		*((bool*) val_ptr) = true;
+	}
+}

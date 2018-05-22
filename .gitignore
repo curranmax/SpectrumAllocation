@@ -1,0 +1,8 @@
+*.o
+s2pc
+
+*.pyc
+runner/graphs/*
+runner/data/*
+
+test_estimation/*
