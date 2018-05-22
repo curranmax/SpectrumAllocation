@@ -28,8 +28,20 @@ public:
 	SpectrumManager() = delete;
 	SpectrumManager(float _factor, int _num_ss_selection, float _rp_alpha, float _pl_alpha, int _bit_count, bool _brief_out)
 			: factor(_factor), num_ss_selection(_num_ss_selection), rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), bit_count(_bit_count), brief_out(_brief_out),
-			order(AlgoOrder::SPLIT_THEN_IDW), pl_type(PathLossType::DB) {}
+			order(AlgoOrder::SPLIT_THEN_IDW), pl_type(PathLossType::RATIO) {}
 	SpectrumManager(const SpectrumManager& sm) = delete;
+
+	void setAlgoOrder(const std::string order_string) {
+		if(order_string == "split_then_idw") { order = AlgoOrder::SPLIT_THEN_IDW; }
+		else if(order_string == "idw_then_split") { order = AlgoOrder::IDW_THEN_SPLIT; }
+		else { std::cerr << "Unknown algo_order: " << order_string << std::endl; }
+	}
+
+	void setPathLossType(const std::string pl_type_string) {
+		if(pl_type_string == "ratio") { pl_type = PathLossType::RATIO; }
+		else if(pl_type_string == "db") { pl_type = PathLossType::DB; }
+		else { std::cerr << "Unknown path_loss_type: " << pl_type_string << std::endl; }
+	}
 
 
 	std::vector<float> run(int party_id,

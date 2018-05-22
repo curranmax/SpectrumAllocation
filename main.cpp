@@ -78,6 +78,9 @@ int main(int argc, char const *argv[]) {
 	}
 
 	SM sm(factor, args.num_ss_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
+	sm.setAlgoOrder(args.algo_order);
+	sm.setPathLossType(args.path_loss_type);
+
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
 

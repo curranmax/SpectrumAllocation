@@ -55,6 +55,9 @@ class Args {
 	// Spectrum Manager params
 	int num_ss_selection;
 
+	std::string algo_order;
+	std::string path_loss_type;
+
 	// TODO allow this to be a floating point value
 	int ss_receive_power_alpha;
 	int path_loss_alpha;

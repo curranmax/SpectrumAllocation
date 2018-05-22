@@ -487,14 +487,12 @@ float SpectrumManager::plainTextRadar(const SU& su,
 		for(unsigned int j = 0; j < pus.size(); ++j) {
 			float sum_weight = 0.0;
 			float sum_weighted_ratio = 0.0;
-			float sum_weighted_ratio2 = 0.0;
 			for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 				int i = sss_inds[x];
 				sum_weight = sum_weight + weights[x];
 				if(pl_type == SpectrumManager::PathLossType::RATIO) {
 					sum_weighted_ratio = sum_weighted_ratio + weights[x] * received_powers[i][j] / pus[j].transmit_power;
 				} else if(pl_type == SpectrumManager::PathLossType::DB) {
-					sum_weighted_ratio2 = sum_weighted_ratio + weights[x] * received_powers[i][j] / pus[j].transmit_power;
 					sum_weighted_ratio = sum_weighted_ratio + weights[x] * 10.0 * (log10(received_powers[i][j]) - log10(pus[j].transmit_power));
 				}
 			}

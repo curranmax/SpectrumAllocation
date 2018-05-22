@@ -42,6 +42,8 @@ def makeDefaultExperimentParam():
 	param.ld_gamma = 1
 
 	param.num_ss_selection = 0
+	algo_order = 'split_then_idw'
+	path_loss_type = 'ratio'
 	param.ss_receive_power_alpha = 1
 	param.ss_path_loss_alpha = 1
 
@@ -67,6 +69,10 @@ class ExperimentParam:
 		self.ld_gamma = None
 
 		self.num_ss_selection = None
+
+		self.algo_order = None
+		self.path_loss_type = None
+
 		self.ss_receive_power_alpha = None
 		self.ss_path_loss_alpha = None
 
@@ -201,7 +207,9 @@ def runExperiment(param):
 			(param.num_pu, 'npu'), (param.num_ss, 'nss'), (param.num_su, 'nsu'), (param.location_range, 'lr'),
 			(param.propagation_model, 'pm'),
 			(param.ld_path_loss0, 'ld_pl0'), (param.ld_dist0, 'ld_d0'), (param.ld_gamma, 'ld_g'),
-			(param.num_ss_selection, 'nss_s'), (param.ss_receive_power_alpha, 'rpa'), (param.ss_path_loss_alpha, 'pla'),
+			(param.num_ss_selection, 'nss_s'),
+			(param.algo_order, 'ao'), (param.path_loss_type, 'plt'),
+			(param.ss_receive_power_alpha, 'rpa'), (param.ss_path_loss_alpha, 'pla'),
 			(param.num_float_bits, 'float_bits'), (param.s2_pc_bit_count, 'bit_count')]
 
 	for val, flag in vs:
@@ -324,7 +332,7 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1]})
+			changes.append({NUM_SS_SELECTION: [1], 'path_loss_type':['db']})
 		if experiment == SMALL_LD_VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'num_pu': [1], PL_ALPHA: [2], RP_ALPHA: [2],
 							'location_range': [250.0], 'num_ss': [625]})

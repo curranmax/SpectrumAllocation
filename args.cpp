@@ -46,6 +46,8 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&ld_dist0, 5.0, "-ld_d0", "REFERENCE_DISTANCE", "For Log-Distance PM, the reference distance."),
 			Arg_Val(&ld_gamma, 1.0, "-ld_g", "LD_GAMMA", "For Log-Distance PM, the gamma parameter."),
 			Arg_Val(&num_ss_selection, 0, "-nss_s", "NUM_SS_SELECTION", "For each SU request, uses only the specified number of nearby SS. A value of 0 uses all SS."),
+			Arg_Val(&algo_order, "split_then_idw", "-ao", "ORDER", "Order of the algorithm. Must be either \"split_then_idw\" or \"idw_then_split\""),
+			Arg_Val(&path_loss_type, "ratio", "-plt", "PATH_LOSS_TYPE", "Units to calculate the path loss in. Must be either \"ratio\" or \"db\""),
 			Arg_Val(&ss_receive_power_alpha, 1.0, "-rpa", "RECEIVE_POWER_ALPHA", "Parameter used when estimated the received power from PUs at SSs"),
 			Arg_Val(&path_loss_alpha, 1.0, "-pla", "PATH_LOSS_ALPHA", "Parameter used when estimating the path loss between PRs and SUs."),
 			Arg_Val(&num_float_bits, 16, "-float_bits", "NUM_FLOAT_BITS", "Number of bits of precision to use during the S2-PC calculations."),
