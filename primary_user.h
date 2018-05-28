@@ -36,6 +36,8 @@ public:
 		return *this;
 	}
 
+	int id;
+
 	LocInt loc;
 
 	// In mW.

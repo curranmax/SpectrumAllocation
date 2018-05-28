@@ -4,19 +4,21 @@
 
 class Location {
 public:
-	Location() : x(0.0), y(0.0) {}
-	Location(float _x, float _y) : x(_x), y(_y) {}
-	Location(const Location& loc) : x(loc.x), y(loc.y) {}
+	Location() : x(0.0), y(0.0), z(0.0) {}
+	Location(float _x, float _y) : x(_x), y(_y), z(100.0) {}
+	Location(float _x, float _y, float _z) : x(_x), y(_y), z(_z) {}
+	Location(const Location& loc) : x(loc.x), y(loc.y), z(loc.z) {}
 
 	const Location& operator=(const Location& loc) {
 		this->x = loc.x;
 		this->y = loc.y;
+		this->z = loc.z;
 		return *this;
 	}
 
 	float dist(const Location& other) const;
 
-	float x, y;
+	float x, y, z;
 };
 
 class LocInt {

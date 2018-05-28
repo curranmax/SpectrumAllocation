@@ -5,8 +5,22 @@
 
 #include <math.h>
 #include <random>
+#include <stdlib.h>
 
 using namespace osuCrypto;
+
+utils::UnitType utils::unit_type = utils::UnitType::ABS;
+
+void utils::setUnitType(const std::string& unit_type_str) {
+	if(unit_type_str == "abs" || unit_type_str == "ABS") {
+		utils::unit_type = UnitType::ABS;
+	} else if(unit_type_str == "db" || unit_type_str == "dB" || unit_type_str == "DB") {
+		utils::unit_type = UnitType::DB;
+	} else {
+		std::cerr << "Invalid unit_type_str: " << unit_type_str << std::endl;
+		exit(1);
+	}
+}
 
 void utils::abs(sInt* v, const sInt& zero) {
 	sInt is_positive = *v >= zero;

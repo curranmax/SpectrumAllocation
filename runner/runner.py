@@ -29,21 +29,31 @@ PL_ALPHA = 'ss_path_loss_alpha'
 def makeDefaultExperimentParam():
 	param = ExperimentParam()
 
+	param.skip_s2pc = False
+
 	param.num_pu = 5
 	param.num_su = 10
 	param.num_ss = 100
 
 	param.location_range = 100
 
-	param.propagation_model = 'log_distance'
+	param.unit_type = 'abs'
 
-	param.ld_path_loss0 = 1
-	param.ld_dist0 = 5
-	param.ld_gamma = 1
+	param.propagation_model = 'longley_rice'
+
+	param.ld_path_loss0 = None
+	param.ld_dist0 = None
+	param.ld_gamma = None
+
+	param.ref_lat = 40.75
+	param.ref_long = 73.25
+
+	param.splat_dir = "../splat/"
+	param.sdf_dir = "sdf/"
+	param.return_dir = "../runner/"
 
 	param.num_ss_selection = 0
-	algo_order = 'split_then_idw'
-	path_loss_type = 'ratio'
+	param.algo_order = 'split_then_idw'
 	param.ss_receive_power_alpha = 1
 	param.ss_path_loss_alpha = 1
 
@@ -55,6 +65,7 @@ def makeDefaultExperimentParam():
 class ExperimentParam:
 	def __init__(self):
 		self.rand_seed = None
+		self.skip_s2pc = False
 
 		self.num_pu = None
 		self.num_su = None
@@ -62,11 +73,20 @@ class ExperimentParam:
 
 		self.location_range = None
 
+		self.unit_type = None
+
 		self.propagation_model = None
 
 		self.ld_path_loss0 = None
 		self.ld_dist0 = None
 		self.ld_gamma = None
+
+		self.ref_lat = None
+		self.ref_long = None
+
+		self.splat_dir = None
+		self.sdf_dir = None
+		self.return_dir = None
 
 		self.num_ss_selection = None
 
@@ -203,10 +223,13 @@ def readInParamResult(filenames):
 
 def runExperiment(param):
 	args = ['../s2pc', '-brief_out']
-	vs =[(param.rand_seed, 'rand_seed'),
+	vs =[(param.rand_seed, 'rand_seed'), (param.skip_s2pc, 'skip_s2pc'),
 			(param.num_pu, 'npu'), (param.num_ss, 'nss'), (param.num_su, 'nsu'), (param.location_range, 'lr'),
+			(param.unit_type, 'ut'),
 			(param.propagation_model, 'pm'),
 			(param.ld_path_loss0, 'ld_pl0'), (param.ld_dist0, 'ld_d0'), (param.ld_gamma, 'ld_g'),
+			(param.ref_lat, 'ref_lat'), (param.ref_long, 'ref_long'),
+			(param.splat_dir, 'splat_dir'), (param.sdf_dir, 'sdf_dir'), (param.return_dir, 'return_dir'), 
 			(param.num_ss_selection, 'nss_s'),
 			(param.algo_order, 'ao'), (param.path_loss_type, 'plt'),
 			(param.ss_receive_power_alpha, 'rpa'), (param.ss_path_loss_alpha, 'pla'),
@@ -214,23 +237,28 @@ def runExperiment(param):
 
 	for val, flag in vs:
 		if val != None:
-			args += ['-' + flag, str(val)]
+			if isinstance(val, bool):
+				if val == True:
+					args += ['-' + flag]
+			else:
+				args += ['-' + flag, str(val)]
 
 	rv = None
-	for i in range(5):
+	for i in range(10):
 		process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 		process.wait()
 
 		# If there is any output to stderr, its assumed that something went wrong, and the experiment must be run again.
 		err_out = [v for v in process.stderr]
 		if len(err_out) != 0:
+			print 'Encountered error, trying again'
 			continue
 
 		rv = makeExperimentResult([v[:-1] for v in process.stdout])
 		break
 
 	if rv == None:
-		raise Exception('Unable to run program, got:\n' + ''.join([v for v in process.stderr]))
+		raise Exception('Unable to run program, got:\n' + ''.join(err_out))
 
 	return rv
 
@@ -256,6 +284,9 @@ def paramToString(var_name, value):
 	if value == None:
 		type_str = 'None'
 		value_str = 'None'
+	elif isinstance(value, bool):
+		type_str = 'bool'
+		value_str = str(value)
 	elif isinstance(value, int):
 		type_str = 'int'
 		value_str = str(value)
@@ -283,6 +314,8 @@ def paramToString(var_name, value):
 def getType(value):
 	if value == None:
 		return 'None'
+	if isinstance(value, bool):
+		return 'bool'
 	if isinstance(value, int):
 		return 'int'
 	if isinstance(value, float):
@@ -294,6 +327,8 @@ def getType(value):
 def convert(var_name, val_type, val_str):
 	if val_type == 'None':
 		return var_name, None
+	if val_type == 'bool':
+		return var_name, bool(val_str)
 	if val_type == 'int':
 		return var_name, int(val_str)
 	if val_type == 'float':
@@ -306,7 +341,7 @@ def convert(var_name, val_type, val_str):
 		return var_name, list(map(int, val_str.split(',')))
 	if val_type == 'list(str)':
 		return var_name, list(map(str, val_str.split(',')))
-	if val_type == 'list(float,float,float)':
+	if val_type == 'list(float,float,float)' or val_type == 'list(float,float)':
 		simple_var_name = var_name[:var_name.find('(')]
 		val_labels = var_name[var_name.find('(') + 1 : var_name.find(')')].split(',')
 
@@ -324,6 +359,7 @@ if __name__ == '__main__':
 	parser.add_argument('-exp', '--experiment_identifier', metavar = 'EXPERIMENT_ID', type = str, nargs = '+', default = [], help = 'List of experiments to run. Must be value in (' + ', '.join(ALL_EXPERIMENT_IDS) + ')')
 	parser.add_argument('-out', '--out_file', metavar = 'OUT_FILE', type = str, nargs = 1, default = [None], help = 'File to write data to')
 	parser.add_argument('-nt', '--num_tests', metavar = 'NUM_TESTS', type = int, nargs = 1, default = [1], help = 'Number of tests to run')
+	parser.add_argument('-skip', '--skip_s2pc', action = 'store_true', help = 'If given, skips the s2pc algorithm')
 
 	args = parser.parse_args()
 	experiments = args.experiment_identifier
@@ -332,10 +368,10 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1], 'path_loss_type':['db']})
+			changes.append({NUM_SS_SELECTION: [1]})
 		if experiment == SMALL_LD_VARY_NUM_SS_SELECT:
-			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'num_pu': [1], PL_ALPHA: [2], RP_ALPHA: [2],
-							'location_range': [250.0], 'num_ss': [625]})
+			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'propagation_model': ['longley_rice'],
+							'num_pu': [1], PL_ALPHA: [2, 4], RP_ALPHA: [2], 'location_range': [100.0], 'num_ss': [100], 'unit_type': ['db']})
 		if experiment == SMALL_LD_VARY_RP_ALPHA:
 			changes.append({RP_ALPHA: [1, 2, 3, 4]})
 		if experiment == SMALL_LD_VARY_PL_ALPHA:
@@ -358,6 +394,9 @@ if __name__ == '__main__':
 				exp_num += 1
 
 				param = makeDefaultExperimentParam()
+
+				if args.skip_s2pc:
+					param.skip_s2pc = True
 
 				for n, v in zip(ns, vs):
 					vars(param)[n] = v

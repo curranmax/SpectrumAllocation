@@ -380,20 +380,24 @@ float SpectrumManager::secureRadar(
 			unsigned int i = sss_inds[x];
 
 			sum_weight = sum_weight + sss_w[x];
-			if(pl_type == SpectrumManager::PathLossType::RATIO) {
+			if(utils::unit_type == utils::UnitType::ABS) {
 				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * sss_rp_from_pu[i][j] / pus_tp[j];
-			} else if(pl_type == SpectrumManager::PathLossType::DB) {
-				std::cerr << "Not implemented yet" << std::endl;
-				exit(0);
+			} else if(utils::unit_type == utils::UnitType::DB) {
+				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] - pus_tp[j]);
+			} else {
+				std::cerr << "Unsupported unit_type" << std::endl;
+				exit(1);
 			}
 		}
 	
 		sInt this_su_tp;
-		if(pl_type == SpectrumManager::PathLossType::RATIO) {
+		if(utils::unit_type == utils::UnitType::ABS) {
 			this_su_tp = prs_thresh[j] * sum_weight / sum_weighted_ratio;
-		} else if(pl_type == SpectrumManager::PathLossType::DB) {
-			std::cerr << "Not implemented yet" << std::endl;
-			exit(0);
+		} else if(utils::unit_type == utils::UnitType::DB) {
+			this_su_tp = prs_thresh[j] - sum_weighted_ratio / sum_weight;
+		} else {
+			std::cerr << "Unsupported unit_type" << std::endl;
+			exit(1);
 		}
 
 		sInt min_su_tp = this_su_tp < su_tp;
@@ -490,9 +494,9 @@ float SpectrumManager::plainTextRadar(const SU& su,
 			for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 				int i = sss_inds[x];
 				sum_weight = sum_weight + weights[x];
-				if(pl_type == SpectrumManager::PathLossType::RATIO) {
+				if(utils::unit_type == utils::UnitType::ABS) {
 					sum_weighted_ratio = sum_weighted_ratio + weights[x] * received_powers[i][j] / pus[j].transmit_power;
-				} else if(pl_type == SpectrumManager::PathLossType::DB) {
+				} else if(utils::unit_type == utils::UnitType::DB) {
 					sum_weighted_ratio = sum_weighted_ratio + weights[x] * 10.0 * (log10(received_powers[i][j]) - log10(pus[j].transmit_power));
 				}
 			}
@@ -500,10 +504,13 @@ float SpectrumManager::plainTextRadar(const SU& su,
 
 
 			float this_transmit_power;
-			if(pl_type == SpectrumManager::PathLossType::RATIO) {
+			if(utils::unit_type == utils::UnitType::ABS) {
 				this_transmit_power = pus[j].prs[0].threshold * sum_weight / sum_weighted_ratio;
-			} else if(pl_type == SpectrumManager::PathLossType::DB) {
-				this_transmit_power = utils::fromdBm(utils::todBm(pus[j].prs[0].threshold) - sum_weighted_ratio / sum_weight);
+			} else if(utils::unit_type == utils::UnitType::DB) {
+				this_transmit_power = pus[j].prs[0].threshold - sum_weighted_ratio / sum_weight;
+			} else {
+				std::cerr << "Unsupported unit_type" << std::endl;
+				exit(1);
 			}
 
 			if(this_transmit_power < transmit_power) {

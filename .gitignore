@@ -6,3 +6,7 @@ runner/graphs/*
 runner/data/*
 
 test_estimation/*
+
+splat/*.qth
+splat/*.txt
+splat/sdf/*

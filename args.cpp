@@ -37,23 +37,30 @@ Args::Args(const int &argc, char const *argv[]) {
 	// Initialize arguments and their flags
 	args = {Arg_Val(&rand_seed, 0, "-rand_seed", "RAND_SEED", "Value to seed RNG with."),
 			Arg_Val(&brief_out, "-brief_out", "If given, only outputs minimal info."),
+			Arg_Val(&skip_s2pc, "-skip_s2pc", "If given, skips the secure algorithm and only runs the plaintext algo."),
 			Arg_Val(&num_pu, 1, "-npu", "NUM_PU", "Number of Primary Users to generate."),
 			Arg_Val(&num_ss, 1, "-nss", "NUM_SS", "Number of Spectrum Sensors to generate."),
 			Arg_Val(&num_su, 1, "-nsu", "NUM_SU", "Number of Secondary Users to generate."),
 			Arg_Val(&location_range, 100.0, "-lr", "LOC_RANGE", "Range of locations entities will be placed"),
+			Arg_Val(&unit_type, "abs", "-ut", "UNIT_TYPE", "Unit type to use for calculations. Must be either \"abs\" or \"db\""),
 			Arg_Val(&propagation_model, "log_distance", "-pm", "PROPAGATION_MODEL", "Ground truth Propagation Model to use"),
 			Arg_Val(&ld_path_loss0, 1.0, "-ld_pl0", "REFERENCE_PATH_LOSS", "For Log-Distance PM, the reference path loss (in dBm)"),
 			Arg_Val(&ld_dist0, 5.0, "-ld_d0", "REFERENCE_DISTANCE", "For Log-Distance PM, the reference distance."),
 			Arg_Val(&ld_gamma, 1.0, "-ld_g", "LD_GAMMA", "For Log-Distance PM, the gamma parameter."),
+			Arg_Val(&ref_lat, 40.75, "-ref_lat", "LATTITUDE", "Reference lattitude used to generate locations of entitites."),
+			Arg_Val(&ref_long, 73.25, "-ref_long", "LONGITUDE", "Reference longitude used to generate locations of entitites."),
+			Arg_Val(&splat_dir, "splat/", "-splat_dir", "DIR", "Directory of Splat data files"),
+			Arg_Val(&sdf_dir, "sdf/", "-sdf_dir", "DIR", "Directory (relative to splat_dir) of sdf data."),
+			Arg_Val(&return_dir, "../", "-return_dir", "DIR", "Directory (relative to splat_dir) of current location."),
 			Arg_Val(&num_ss_selection, 0, "-nss_s", "NUM_SS_SELECTION", "For each SU request, uses only the specified number of nearby SS. A value of 0 uses all SS."),
 			Arg_Val(&algo_order, "split_then_idw", "-ao", "ORDER", "Order of the algorithm. Must be either \"split_then_idw\" or \"idw_then_split\""),
-			Arg_Val(&path_loss_type, "ratio", "-plt", "PATH_LOSS_TYPE", "Units to calculate the path loss in. Must be either \"ratio\" or \"db\""),
 			Arg_Val(&ss_receive_power_alpha, 1.0, "-rpa", "RECEIVE_POWER_ALPHA", "Parameter used when estimated the received power from PUs at SSs"),
 			Arg_Val(&path_loss_alpha, 1.0, "-pla", "PATH_LOSS_ALPHA", "Parameter used when estimating the path loss between PRs and SUs."),
 			Arg_Val(&num_float_bits, 16, "-float_bits", "NUM_FLOAT_BITS", "Number of bits of precision to use during the S2-PC calculations."),
 			Arg_Val(&s2_pc_bit_count, 64, "-bit_count", "BIT_COUNT", "Number of total bits to use in S2-PC calculations.")
-		};
+	};
 
+	bool err = false;
 	for(unsigned int i = 0; i < cmd_args.size(); ++i) {
 		if(cmd_args[i] == "-h" || cmd_args[i] == "-help") {
 			printHelp();
@@ -69,7 +76,18 @@ Args::Args(const int &argc, char const *argv[]) {
 		// IF NONE FOUND PRINT AN ERROR MESSAGE
 		if(!match_found) {
 			std::cerr << "INVALID COMMAND LINE ARG: " << cmd_args[i] << std::endl;
+			err = true;
 		}
+	}
+	if(err) {
+		for(unsigned int i = 0; i < cmd_args.size(); ++i) {
+			std::cerr << cmd_args[i];
+			if(i < cmd_args.size() - 1) {
+				std::cerr << " ";
+			}
+		}
+		std::cerr << std::endl;
+		exit(0);
 	}
 }
 

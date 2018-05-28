@@ -6,7 +6,18 @@
 
 using namespace osuCrypto;
 
+
 namespace utils {
+
+enum UnitType {
+	ABS,
+	DB
+};
+
+void setUnitType(const std::string& unit_type_str);
+
+extern UnitType unit_type;
+
 // abs
 // v is the value to calculate the abs on, the argument is modified in place.
 void abs(sInt* v, const sInt& zero);

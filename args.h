@@ -38,11 +38,15 @@ class Args {
 	int rand_seed;
 	bool brief_out;
 
+	bool skip_s2pc;
+
 	// Generation params
 	int num_pu;
 	int num_ss;
 	int num_su;
-	float location_range;
+	float location_range; // in Meters
+	
+	std::string unit_type; // Either "abs" or "db".
 
 	// Propagation Model
 	std::string propagation_model;
@@ -52,11 +56,18 @@ class Args {
 	float ld_dist0;
 	float ld_gamma;
 
+	// Longley-Rice Params
+	float ref_lat;
+	float ref_long;
+
+	std::string splat_dir;
+	std::string sdf_dir;
+	std::string return_dir;
+
 	// Spectrum Manager params
 	int num_ss_selection;
 
 	std::string algo_order;
-	std::string path_loss_type;
 
 	// TODO allow this to be a floating point value
 	int ss_receive_power_alpha;

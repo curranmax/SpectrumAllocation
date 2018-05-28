@@ -6,13 +6,16 @@
 #include "primary_user.h"
 #include "secondary_user.h"
 #include "spectrum_sensor.h"
+#include "utils.h"
 
 #include <string>
 #include <vector>
 
 class PropagationModel {
 public:
-	virtual float getPathLossRatio(const Location& loc1, const Location& loc2) const = 0;
+	PropagationModel() {}
+
+	virtual float getPathLoss(const Location& loc1, const Location& loc2) const = 0;
 	virtual ~PropagationModel() {}
 };
 
@@ -44,7 +47,7 @@ public:
 	LogDistancePM(const LogDistancePM& ld) = delete;
 	~LogDistancePM() {}
 
-	float getPathLossRatio(const Location& loc1, const Location& loc2) const;
+	float getPathLoss(const Location& loc1, const Location& loc2) const;
 
 private:
 	float pl0, d0, gamma;
@@ -53,14 +56,18 @@ private:
 class LongleyRicePM : public PropagationModel {
 public:
 	LongleyRicePM() = delete;
-	LongleyRicePM(int x) : y(x) {}
+	LongleyRicePM(float _ref_lat, float _ref_long,
+					const std::string _splat_dir, const std::string _sdf_dir, const std::string _return_dir)
+			: PropagationModel(), ref_lat(_ref_lat), ref_long(_ref_long), splat_dir(_splat_dir), sdf_dir(_sdf_dir), return_dir(_return_dir) {}
 	LongleyRicePM(const LongleyRicePM& lr) = delete;
 	~LongleyRicePM() {}
 
-	float getPathLossRatio(const Location& loc1, const Location& loc2) const;
+	float getPathLoss(const Location& loc1, const Location& loc2) const;
 
 private:
-	int y;
+	float ref_lat, ref_long;
+
+	std::string splat_dir, sdf_dir, return_dir;
 };
 
 #endif
