@@ -53,6 +53,7 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&sdf_dir, "sdf/", "-sdf_dir", "DIR", "Directory (relative to splat_dir) of sdf data."),
 			Arg_Val(&return_dir, "../", "-return_dir", "DIR", "Directory (relative to splat_dir) of current location."),
 			Arg_Val(&num_ss_selection, 0, "-nss_s", "NUM_SS_SELECTION", "For each SU request, uses only the specified number of nearby SS. A value of 0 uses all SS."),
+			Arg_Val(&num_pu_selection, 0, "-npu_s", "NUM_PU_SELECTION", "For each SU request, uses only the specified number of nearby PU. A value of 0 uses all SS."),
 			Arg_Val(&algo_order, "split_then_idw", "-ao", "ORDER", "Order of the algorithm. Must be either \"split_then_idw\" or \"idw_then_split\""),
 			Arg_Val(&ss_receive_power_alpha, 1.0, "-rpa", "RECEIVE_POWER_ALPHA", "Parameter used when estimated the received power from PUs at SSs"),
 			Arg_Val(&path_loss_alpha, 1.0, "-pla", "PATH_LOSS_ALPHA", "Parameter used when estimating the path loss between PRs and SUs."),

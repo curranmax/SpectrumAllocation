@@ -53,6 +53,7 @@ def makeDefaultExperimentParam():
 	param.return_dir = "../runner/"
 
 	param.num_ss_selection = 0
+	param.num_pu_selection = 0
 	param.algo_order = 'split_then_idw'
 	param.ss_receive_power_alpha = 1
 	param.ss_path_loss_alpha = 1
@@ -65,7 +66,7 @@ def makeDefaultExperimentParam():
 class ExperimentParam:
 	def __init__(self):
 		self.rand_seed = None
-		self.skip_s2pc = False
+		self.skip_s2pc = None
 
 		self.num_pu = None
 		self.num_su = None
@@ -89,6 +90,7 @@ class ExperimentParam:
 		self.return_dir = None
 
 		self.num_ss_selection = None
+		self.num_pu_selection = None
 
 		self.algo_order = None
 		self.path_loss_type = None
@@ -230,7 +232,7 @@ def runExperiment(param):
 			(param.ld_path_loss0, 'ld_pl0'), (param.ld_dist0, 'ld_d0'), (param.ld_gamma, 'ld_g'),
 			(param.ref_lat, 'ref_lat'), (param.ref_long, 'ref_long'),
 			(param.splat_dir, 'splat_dir'), (param.sdf_dir, 'sdf_dir'), (param.return_dir, 'return_dir'), 
-			(param.num_ss_selection, 'nss_s'),
+			(param.num_ss_selection, 'nss_s'), (param.num_ss_selection, 'npu_s'),
 			(param.algo_order, 'ao'), (param.path_loss_type, 'plt'),
 			(param.ss_receive_power_alpha, 'rpa'), (param.ss_path_loss_alpha, 'pla'),
 			(param.num_float_bits, 'float_bits'), (param.s2_pc_bit_count, 'bit_count')]
@@ -297,7 +299,10 @@ def paramToString(var_name, value):
 		type_str = 'str'
 		value_str = str(value)
 	elif isinstance(value, list):
-		if isinstance(value[0], int):
+		if isinstance(value[0], bool):
+			type_str = 'list(bool)'
+			value_str = ','.join(map(str, value))
+		elif isinstance(value[0], int):
 			type_str = 'list(int)'
 			value_str = ','.join(map(str, value))
 		elif isinstance(value[0], float):
@@ -335,10 +340,12 @@ def convert(var_name, val_type, val_str):
 		return var_name, float(val_str)
 	if val_type == 'str':
 		return var_name, val_str
+	if val_type == 'list(bool)':
+		return var_name, list(map(bool, val_str.split(',')))
 	if val_type == 'list(int)':
 		return var_name, list(map(int, val_str.split(',')))
 	if val_type == 'list(float)':
-		return var_name, list(map(int, val_str.split(',')))
+		return var_name, list(map(float, val_str.split(',')))
 	if val_type == 'list(str)':
 		return var_name, list(map(str, val_str.split(',')))
 	if val_type == 'list(float,float,float)' or val_type == 'list(float,float)':
@@ -368,7 +375,7 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1]})
+			changes.append({NUM_SS_SELECTION: [1], 'num_pu_selection': [1], 'num_pu': [2], 'num_ss':[50], 'num_su':[2]})
 		if experiment == SMALL_LD_VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'propagation_model': ['longley_rice'],
 							'num_pu': [1], PL_ALPHA: [2, 4], RP_ALPHA: [2], 'location_range': [100.0], 'num_ss': [100], 'unit_type': ['db']})

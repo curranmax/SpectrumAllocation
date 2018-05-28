@@ -54,7 +54,7 @@ int main(int argc, char const *argv[]) {
 	gen.generateEntities(args.num_pu, args.num_ss, args.num_su, &pus, &sss, &sus);
 	
 	float factor = 1 << args.num_float_bits;
-	SM sm(factor, args.num_ss_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
+	SM sm(factor, args.num_ss_selection, args.num_pu_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
 	sm.setAlgoOrder(args.algo_order);
 
 	std::vector<float> secure_vs_a;

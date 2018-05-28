@@ -66,6 +66,7 @@ class Args {
 
 	// Spectrum Manager params
 	int num_ss_selection;
+	int num_pu_selection;
 
 	std::string algo_order;
 

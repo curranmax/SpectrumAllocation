@@ -238,9 +238,27 @@ float SpectrumManager::secureRadar(
 	sInt su_y = su_y_a + su_y_b;
 
 	// PU
+	unsigned int k_pu = pus.size();
+	if(this->num_pu_selection > 0) {
+		k_pu = this->num_pu_selection;
+	}
+	std::vector<sInt> pus_x;
+	std::vector<sInt> pus_y;
 	std::vector<sInt> pus_tp;
 	std::vector<sInt> prs_thresh;
 	for(unsigned int i = 0; i < pus.size(); ++i) {
+		if(k_pu < pus.size()) {	
+			sInt pu_x_a = INPUT(parties, 0, pus[i].loc.x, bit_count);
+			sInt pu_x_b = INPUT(parties, 1, pus[i].loc.x, bit_count);
+
+			pus_x.push_back(pu_x_a + pu_x_b);
+
+			sInt pu_y_a = INPUT(parties, 0, pus[i].loc.y, bit_count);
+			sInt pu_y_b = INPUT(parties, 1, pus[i].loc.y, bit_count);
+
+			pus_y.push_back(pu_y_a + pu_y_b);
+		}
+
 		sInt pu_tp_a = INPUT(parties, 0, pus[i].transmit_power, bit_count);
 		sInt pu_tp_b = INPUT(parties, 1, pus[i].transmit_power, bit_count);
 	
@@ -276,6 +294,53 @@ float SpectrumManager::secureRadar(
 			sInt sss_rp_from_pu_b = INPUT(parties, 1, plaintext_sss_rp_from_pu[i][j], bit_count);
 
 			sss_rp_from_pu[i].push_back(sss_rp_from_pu_a + sss_rp_from_pu_b);
+		}
+	}
+
+	// |----------------------------|
+	// |  Select the k-closest PUs  |
+	// |----------------------------|
+	std::vector<int> pu_inds;
+	if(k_pu < pus.size()) {
+		std::vector<sInt> secret_pu_inds;
+		std::vector<sInt> secret_pu_dists;
+		for(unsigned int i = 0; i < pus.size(); ++i) {
+			sInt dist_pu_su = ((su_x - pus_x[i]) * (su_x - pus_x[i]) + (su_y - pus_y[i]) * (su_y - pus_y[i])) / factor_int;
+			sInt ind = INPUT(parties, 0, i, bit_count);
+
+			if(i < k_pu) {
+				secret_pu_inds.push_back(ind + zero);
+				secret_pu_dists.push_back(dist_pu_su + zero);
+			} else {
+				for(unsigned int x = 0; x < secret_pu_inds.size(); ++x) {
+					sInt comp = dist_pu_su < secret_pu_dists[x];
+
+					sInt tmp = comp.ifelse(dist_pu_su, secret_pu_dists[x]);
+					dist_pu_su = comp.ifelse(secret_pu_dists[x], dist_pu_su);
+					secret_pu_dists[x] = tmp + zero;
+
+					tmp = comp.ifelse(ind, secret_pu_inds[x]);
+					ind = comp.ifelse(secret_pu_inds[x], ind);
+					secret_pu_inds[x] = tmp + zero;
+				}
+			}
+		}
+
+		for(unsigned int i = 0; i < secret_pu_inds.size(); ++i) {
+			parties[0].reveal(secret_pu_inds[i]);
+			sInt tmp = secret_pu_inds[i] + zero;
+			parties[1].reveal(tmp);
+
+			if(parties[0].isLocalParty()) {
+				pu_inds.push_back(secret_pu_inds[i].getValue());
+			} else if(parties[1].isLocalParty()) {
+				pu_inds.push_back(tmp.getValue());
+			}
+		}
+	} else {
+		std::vector<int> pu_inds;
+		for(unsigned int i = 0; i < pus.size(); ++i) {
+			pu_inds.push_back(i);
 		}
 	}
 
@@ -373,7 +438,8 @@ float SpectrumManager::secureRadar(
 	// su_rp = pr_thresh * sum(w(SS)) / (sum(r(SS)/t(PU) * w(SS)))
 	sInt su_tp = large + zero;
 
-	for(unsigned int j = 0; j < pus.size(); ++j) {
+	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
+		unsigned int j = pu_inds[y];
 		sInt sum_weight = INPUT(parties, 0, 0, bit_count);
 		sInt sum_weighted_ratio = INPUT(parties, 0, 0, bit_count);
 		for(unsigned int x = 0; x < sss_inds.size(); ++x) {
@@ -427,6 +493,36 @@ float SpectrumManager::secureRadar(
 float SpectrumManager::plainTextRadar(const SU& su,
 										const std::vector<PU>& pus,
 										const std::vector<SS>& sss) const {
+	// PU selection.
+	std::vector<int> pu_inds;
+	std::vector<float> pu_dists;
+	unsigned int k_pu = sss.size();
+	if(this->num_pu_selection > 0) {
+		k_pu = this->num_pu_selection;
+	}
+	for(unsigned int i = 0; i < pus.size(); ++i) {
+		float dist = su.loc.dist(pus[i].loc);
+		int ind = i;
+
+		if(i < k_pu) {
+			pu_inds.push_back(ind);
+			pu_dists.push_back(dist);
+		} else {
+			for(unsigned int x = 0; x < pu_inds.size(); ++x) {
+				if(dist < pu_dists[x]) {
+					float tmp_dist = dist;
+					dist = pu_dists[x];
+					pu_dists[x] = tmp_dist;
+
+					float tmp_ind = ind;
+					ind = pu_inds[x];
+					pu_inds[x] = tmp_ind;
+				}
+			}
+		}
+	}
+
+
 	// SS selection.
 	std::vector<int> sss_inds;
 	std::vector<float> sss_dists;
@@ -488,7 +584,8 @@ float SpectrumManager::plainTextRadar(const SU& su,
 		
 		// Compute SU transmit power
 		// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
-		for(unsigned int j = 0; j < pus.size(); ++j) {
+		for(unsigned int y = 0; y < pu_inds.size(); ++y) {
+			unsigned int j = pu_inds[y];
 			float sum_weight = 0.0;
 			float sum_weighted_ratio = 0.0;
 			for(unsigned int x = 0; x < sss_inds.size(); ++x) {
@@ -530,7 +627,8 @@ float SpectrumManager::plainTextRadar(const SU& su,
 
 		sum_weight = 0.0;
 		std::vector<float> pu_weights;
-		for(unsigned int j = 0; j < pus.size(); ++j) {
+		for(unsigned int y = 0; y < pu_inds.size(); ++y) {
+			unsigned int j = pu_inds[y];
 			float d = su.loc.dist(pus[j].loc);
 			if(d < 0.0001) {
 				d = 0.0001;
@@ -539,7 +637,8 @@ float SpectrumManager::plainTextRadar(const SU& su,
 			pu_weights.push_back(1 / pow(d, rp_alpha));
 		}
 
-		for(unsigned int j = 0; j < pus.size(); ++j) {
+		for(unsigned int y = 0; y < pu_inds.size(); ++y) {
+			unsigned int j = pu_inds[y];
 			float this_path_loss = pu_weights[j] * received_power / sum_weight / pus[j].transmit_power;
 			float this_transmit_power = pus[j].prs[0].threshold / this_path_loss;
 

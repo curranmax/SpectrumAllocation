@@ -21,8 +21,8 @@ public:
 	};
 
 	SpectrumManager() = delete;
-	SpectrumManager(float _factor, int _num_ss_selection, float _rp_alpha, float _pl_alpha, int _bit_count, bool _brief_out)
-			: factor(_factor), num_ss_selection(_num_ss_selection), rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), bit_count(_bit_count), brief_out(_brief_out),
+	SpectrumManager(float _factor, int _num_ss_selection, int _num_pu_selection, float _rp_alpha, float _pl_alpha, int _bit_count, bool _brief_out)
+			: factor(_factor), num_ss_selection(_num_ss_selection), num_pu_selection(_num_pu_selection), rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), bit_count(_bit_count), brief_out(_brief_out),
 			order(AlgoOrder::SPLIT_THEN_IDW) {}
 	SpectrumManager(const SpectrumManager& sm) = delete;
 
@@ -55,6 +55,7 @@ private:
 	float factor;
 
 	int num_ss_selection;
+	int num_pu_selection;
 
 	int rp_alpha;
 	int pl_alpha;
