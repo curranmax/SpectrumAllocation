@@ -152,9 +152,9 @@ int main(int argc, char const *argv[]) {
 			}
 			std::cout << "Diff GvP:   " << fabs(plaintext_vs[i] - ground_truth_vs[i]) << std::endl;
 			if(!args.skip_s2pc) {
-				std::cout << "% Diff PvS: " << fabs(secure_vs[i] - plaintext_vs[i]) / plaintext_vs[i] * 100 << "%" << std::endl;
+				std::cout << "% Diff PvS: " << fabs(secure_vs[i] - plaintext_vs[i]) / fabs(plaintext_vs[i]) * 100 << "%" << std::endl;
 			}
-			std::cout << "% Diff GvP: " << fabs(plaintext_vs[i] - ground_truth_vs[i]) / ground_truth_vs[i] * 100 << "%" << std::endl;
+			std::cout << "% Diff GvP: " << fabs(plaintext_vs[i] - ground_truth_vs[i]) / fabs(ground_truth_vs[i]) * 100 << "%" << std::endl;
 			std::cout << "--------------------" << std::endl;
 		}
 

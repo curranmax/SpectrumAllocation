@@ -36,6 +36,7 @@ void Generator::generateEntities(
 			// Do Nothing
 		} else if(utils::unit_type == utils::UnitType::DB) {
 			transmit_power = utils::todBm(transmit_power);
+			threshold = utils::todBm(threshold);
 		} else {
 			std::cerr << "Unsupported unit_type" << std::endl;
 			exit(1);
@@ -53,12 +54,18 @@ void Generator::generateEntities(
 		Location loc(x, y, ss_height);
 
 		float rp = 0.0;
+		bool first = true;
 		for(int j = 0; j < num_pu; ++j) {
 			float path_loss = pm->getPathLoss((*pus)[j].loc, loc);
 			if(utils::unit_type == utils::UnitType::ABS) {
 				rp += path_loss * (*pus)[j].transmit_power;
 			} else if(utils::unit_type == utils::UnitType::DB) {
-				rp = utils::todBm(utils::fromdBm(rp) + utils::fromdBm(path_loss + (*pus)[j].transmit_power));
+				if(first) {
+					first = false;
+					rp = path_loss + (*pus)[j].transmit_power;
+				} else {
+					rp = utils::todBm(utils::fromdBm(rp) + utils::fromdBm(path_loss + (*pus)[j].transmit_power));
+				}
 			}
 		}
 
@@ -85,7 +92,8 @@ float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus) co
 			if(utils::unit_type == utils::UnitType::ABS) {
 				this_tp = pus[i].prs[j].threshold / pm->getPathLoss(su.loc, pus[i].prs[j].loc);
 			} else if(utils::unit_type == utils::UnitType::DB) {
-				this_tp = pus[i].prs[j].threshold + pm->getPathLoss(su.loc, pus[i].prs[j].loc);
+				float pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);
+				this_tp = pus[i].prs[j].threshold - pl;
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);

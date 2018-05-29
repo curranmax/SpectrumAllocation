@@ -338,7 +338,6 @@ float SpectrumManager::secureRadar(
 			}
 		}
 	} else {
-		std::vector<int> pu_inds;
 		for(unsigned int i = 0; i < pus.size(); ++i) {
 			pu_inds.push_back(i);
 		}
@@ -437,7 +436,6 @@ float SpectrumManager::secureRadar(
 	// |--------------------------------|
 	// su_rp = pr_thresh * sum(w(SS)) / (sum(r(SS)/t(PU) * w(SS)))
 	sInt su_tp = large + zero;
-
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
 		unsigned int j = pu_inds[y];
 		sInt sum_weight = INPUT(parties, 0, 0, bit_count);
@@ -481,6 +479,7 @@ float SpectrumManager::secureRadar(
 	// be required but in the mean time, if one party does not call getValue(), then
 	// processesQueue() should be called.
 	// parties[1].getRuntime().processesQueue();
+
 
 	if (parties[0].isLocalParty()) {
 		return float(su_tp_a.getValue()) / factor;
@@ -594,12 +593,10 @@ float SpectrumManager::plainTextRadar(const SU& su,
 				if(utils::unit_type == utils::UnitType::ABS) {
 					sum_weighted_ratio = sum_weighted_ratio + weights[x] * received_powers[i][j] / pus[j].transmit_power;
 				} else if(utils::unit_type == utils::UnitType::DB) {
-					sum_weighted_ratio = sum_weighted_ratio + weights[x] * 10.0 * (log10(received_powers[i][j]) - log10(pus[j].transmit_power));
+					sum_weighted_ratio = sum_weighted_ratio + weights[x] * (received_powers[i][j] - pus[j].transmit_power);
 				}
 			}
 			
-
-
 			float this_transmit_power;
 			if(utils::unit_type == utils::UnitType::ABS) {
 				this_transmit_power = pus[j].prs[0].threshold * sum_weight / sum_weighted_ratio;
