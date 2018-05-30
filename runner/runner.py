@@ -1,7 +1,7 @@
 
 import subprocess
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 import itertools
 from operator import mul
 from copy import deepcopy
@@ -101,6 +101,9 @@ class ExperimentParam:
 		self.num_float_bits = None
 		self.s2_pc_bit_count = None
 
+	def getValue(self, yv):
+		return getattr(self, yv)
+
 def makeExperimentResult(vals):
 	result = ExperimentResult()
 	for val in vals:
@@ -117,6 +120,7 @@ def makeExperimentResult(vals):
 
 class ExperimentResult:
 	def __init__(self):
+		ground_truth_path_loss = None
 		preprocess_time = None
 		su_transmit_power = None
 		rand_seed = None
@@ -150,6 +154,12 @@ class ExperimentResult:
 			return str(getattr(self, var_name))
 		
 		return ','.join(':'.join(map(str, vs)) for vs in zip(*tuple(getattr(self, var_name)[label] for label in var_order)))
+
+	def hasAttr(self, yv):
+		if isinstance(yv, str):
+			return yv in vars(self)
+		if isinstance(yv, tuple) and len(yv) == 2:
+			return yv[0] in vars(self) and yv[1] in getattr(self, yv[0])
 
 	def getValue(self, yv):
 		if isinstance(yv, str):
@@ -223,7 +233,7 @@ def readInParamResult(filenames):
 				rv.append((this_params, this_result))
 	return rv
 
-def runExperiment(param):
+def runExperiment(param, no_run = False):
 	args = ['../s2pc', '-brief_out']
 	vs =[(param.rand_seed, 'rand_seed'), (param.skip_s2pc, 'skip_s2pc'),
 			(param.num_pu, 'npu'), (param.num_ss, 'nss'), (param.num_su, 'nsu'), (param.location_range, 'lr'),
@@ -245,24 +255,27 @@ def runExperiment(param):
 			else:
 				args += ['-' + flag, str(val)]
 
-	rv = None
-	for i in range(10):
-		process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-		process.wait()
+	if no_run:
+		print ' '.join(args)
+	else:
+		rv = None
+		for i in range(10):
+			process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+			process.wait()
 
-		# If there is any output to stderr, its assumed that something went wrong, and the experiment must be run again.
-		err_out = [v for v in process.stderr]
-		if len(err_out) != 0:
-			print 'Encountered error, trying again'
-			continue
+			# If there is any output to stderr, its assumed that something went wrong, and the experiment must be run again.
+			err_out = [v for v in process.stderr]
+			if len(err_out) != 0:
+				print 'Encountered error, trying again'
+				continue
 
-		rv = makeExperimentResult([v[:-1] for v in process.stdout])
-		break
+			rv = makeExperimentResult([v[:-1] for v in process.stdout])
+			break
 
-	if rv == None:
-		raise Exception('Unable to run program, got:\n' + ''.join(err_out))
+		if rv == None:
+			raise Exception('Unable to run program, got:\n' + ''.join(err_out))
 
-	return rv
+		return rv
 
 def getSharedParam(out_values):
 	shared_param = ExperimentParam()
@@ -358,6 +371,16 @@ def convert(var_name, val_type, val_str):
 
 	raise Exception('Unknown type: (' + str(var_name) + ', ' + str(val_type) + ', ' + str(val_str) + ')')
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description = 'Runs experiments. Has the parameters for each experiment saved, so they don\'t have to be reentered')
 	
@@ -378,7 +401,7 @@ if __name__ == '__main__':
 			changes.append({NUM_SS_SELECTION: [1], 'num_pu_selection': [1], 'num_pu': [2], 'num_ss':[50], 'num_su':[2]})
 		if experiment == SMALL_LD_VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'propagation_model': ['longley_rice'],
-							'num_pu': [1], PL_ALPHA: [2, 4], RP_ALPHA: [2], 'location_range': [100.0], 'num_ss': [100], 'unit_type': ['db']})
+							'num_pu': [1], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [100.0], 'num_ss': [100], 'unit_type': ['db']})
 		if experiment == SMALL_LD_VARY_RP_ALPHA:
 			changes.append({RP_ALPHA: [1, 2, 3, 4]})
 		if experiment == SMALL_LD_VARY_PL_ALPHA:
@@ -393,6 +416,8 @@ if __name__ == '__main__':
 
 	out_values = []
 	exp_num = 1
+	durs = []
+	begin_time = None
 	for i in range(args.num_tests[0]):
 		for change in changes:
 			ns = change.keys()
@@ -408,8 +433,25 @@ if __name__ == '__main__':
 				for n, v in zip(ns, vs):
 					vars(param)[n] = v
 
+				start = datetime.now()
+				if begin_time == None:
+					begin_time = start
 				result = runExperiment(param)
 				out_values.append((param, result))
+				end = datetime.now()
+				durs.append(end - start)
+
+				print 'Experiment took', bcolors.BOLD + bcolors.OKBLUE + str(end - start) + bcolors.ENDC
+
+				if num_experiments - exp_num > 0:
+					avg_dur = sum(durs, timedelta(0)) / len(durs)
+					expected_end = datetime.now() + avg_dur * (num_experiments - exp_num)
+					if expected_end.date() == datetime.now().date():
+						expected_end_str = expected_end.strftime('%-I:%M:%S.%f %p')
+					else:
+						expected_end_str = expected_end.strftime('%A %b %-d %-I:%M:%S.%f %p')
+
+					print 'Expected end at', bcolors.BOLD + bcolors.OKGREEN + expected_end_str + bcolors.ENDC
 
 
 	out_file = args.out_file[0]

@@ -3,7 +3,7 @@ import argparse
 import matplotlib.pyplot as plt
 from numpy import median
 
-from runner import readInParamResult
+from runner import readInParamResult, runExperiment
 
 class Point:
 	def __init__(self, x, y, group):
@@ -18,8 +18,14 @@ def groupValues(raw_values, xv, xfunc, yv, yfunc, gv):
 
 		this_group = tuple(getattr(param, g) for g in gv)
 
-		tmp_y = tuple(result.getValue(y) for y in yv)
-		if all(isinstance(k, list) for k in tmp_y):
+		tmp_y = tuple((result.getValue(y) if result.hasAttr(y) else param.getValue(y)) for y in yv)
+		if any(isinstance(k, list) for k in tmp_y):
+			lens = [len(k) for k in tmp_y if isinstance(k, list)]
+			if any(v != lens[0] for v in lens):
+				raise Exception('All lists must be of same length')
+
+			tmp_y = [(k if isinstance(k, list) else [k] * lens[0]) for k in tmp_y]
+
 			for vs in zip(*tmp_y):
 				this_y = yfunc(*vs)
 				points.append(Point(this_x, this_y, this_group))
@@ -70,8 +76,17 @@ def plotData(data, reduce_function = None, include_errbars = False, title = None
 
 	plt.show()
 
-def percentDifference(v1, v2):
-	return float(abs(v1 - v2)) / float(v2) * 100.0
+def percentDifference(v1, v2, unit_type):
+	if unit_type == 'db':
+		v1 = pow(10.0, v1 / 10.0)
+		v2 = pow(10.0, v2 / 10.0)
+	return float(abs(v1 - v2)) / float(abs(v2)) * 100.0
+
+def dbDifference(v1, v2, unit_type):
+	if unit_type == 'abs':
+		v1 = 10.0 * log(v1, 10.0)
+		v2 = 10.0 * log(v2, 10.0)
+	return abs(v1 - v2)
 
 def average(vals):
 	return sum(vals) / float(len(vals))
@@ -87,11 +102,14 @@ def getXLabel(xv):
 		print 'Unrecognized xv:', xv
 		return str(xv)
 
-y_labels = {(('su_transmit_power', 'secure'), ('su_transmit_power', 'plain')): 'Percent Difference between Secure and Plain',
-			(('su_transmit_power', 'plain'), ('su_transmit_power', 'ground')): 'Percent Difference between Plain and Ground',
-			(('su_transmit_power', 'secure'), ('su_transmit_power', 'ground')): 'Percent Difference between Secure and Ground',
-			('time_per_request',): 'Time per SU Request (seconds)',
-			('preprocess_time',): 'Pre-process time (seconds)'}
+y_labels = {'percent_diff_secure_vs_plain': 'Percent Difference between Secure and Plain',
+			'percent_diff_plain_vs_ground': 'Percent Difference between Plain and Ground',
+			'percent_diff_secure_vs_ground': 'Percent Difference between Secure and Ground',
+			'db_diff_secure_vs_plain': 'dB Difference between Secure and Plain',
+			'db_diff_plain_vs_ground': 'dB Difference between Plain and Ground',
+			'db_diff_secure_vs_ground': 'dB Difference between Secure and Ground',
+			'time_per_request': 'Time per SU Request (seconds)',
+			'preprocess_time': 'Pre-process time (seconds)'}
 
 def getYLabel(yv):
 	if yv in y_labels:
@@ -115,7 +133,8 @@ if __name__ == '__main__':
 
 	# Y values
 	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'),
-				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg')]
+				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
+				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db')]
 	for full_yv, short_yv in y_values:
 		parser.add_argument('-y_' + short_yv, '--use_' + full_yv + '_for_y_value', action = 'store_true', help = 'If given, uses ' + full_yv + ' for the y dimension.')
 
@@ -135,6 +154,15 @@ if __name__ == '__main__':
 
 	raw_values = readInParamResult(args.in_files)
 
+# 	vals = [(percentDifference(plain, ground), param, result) for param, result in raw_values
+# 				for plain, ground in zip(result.su_transmit_power['plain'], result.su_transmit_power['ground'])]
+# 	v, param, result = max(vals)
+
+# 	param.rand_seed = result.rand_seed
+
+# 	runExperiment(param, no_run = True)
+# else:
+
 	xv = None
 	xfunc = None
 	for full_xv, _ in x_values:
@@ -146,12 +174,19 @@ if __name__ == '__main__':
 
 	yv = None
 	yfunc = None
-	complex_y_values = {'percent_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain')),
-						'percent_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground')),
-						'percent_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'))}
+	complex_y_values = {'percent_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
+						'percent_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
+						'percent_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
+						'db_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
+						'db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
+						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type')}
 	complex_y_funcs = {'percent_diff_secure_vs_plain': percentDifference,
 						'percent_diff_plain_vs_ground': percentDifference,
-						'percent_diff_secure_vs_ground': percentDifference}
+						'percent_diff_secure_vs_ground': percentDifference,
+						'db_diff_secure_vs_plain': dbDifference,
+						'db_diff_plain_vs_ground': dbDifference,
+						'db_diff_secure_vs_ground': dbDifference}
+	this_y_value = None
 	for full_yv, _ in y_values:
 		if getattr(args, 'use_' + full_yv + '_for_y_value'):
 			if yv != None:
@@ -162,6 +197,7 @@ if __name__ == '__main__':
 			else:
 				yv = (full_yv,)
 				yfunc = lambda y: y
+			this_y_value = full_yv
 
 	gv = []
 	for full_gv, _ in g_values:
@@ -170,4 +206,4 @@ if __name__ == '__main__':
 
 	data = groupValues(raw_values, xv, xfunc, yv, yfunc, gv)
 	plotData(data, reduce_function = rfuncs[args.reduce_function[0]], include_errbars = args.include_errbars,
-				title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(yv))
+				title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value))

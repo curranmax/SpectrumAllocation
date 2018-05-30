@@ -32,7 +32,7 @@ public:
 	void generateEntities(int num_pu, int num_ss, int num_su,
 						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const;
 
-	float computeGroundTruth(const SU& su, const std::vector<PU>& pus) const;
+	float computeGroundTruth(const SU& su, const std::vector<PU>& pus, float* ground_truth_path_loss) const;
 
 private:
 	float location_range;

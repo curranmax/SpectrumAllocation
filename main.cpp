@@ -105,6 +105,7 @@ int main(int argc, char const *argv[]) {
 	std::vector<float> secure_vs;
 	std::vector<float> plaintext_vs;
 	std::vector<float> ground_truth_vs;
+	std::vector<float> ground_truth_path_loss;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		if(!args.skip_s2pc) {
 			float secure_v = secure_vs_a[i] + secure_vs_b[i];
@@ -112,13 +113,25 @@ int main(int argc, char const *argv[]) {
 		}
 
 		float plaintext_v = sm.plainTextRadar(sus[i], pus, sss);
-		float ground_truth_v = gen.computeGroundTruth(sus[i], pus);
+		float this_gt_pl = 0.0;
+		float ground_truth_v = gen.computeGroundTruth(sus[i], pus, &this_gt_pl);
+
+		ground_truth_path_loss.push_back(this_gt_pl);
 
 		plaintext_vs.push_back(plaintext_v);
 		ground_truth_vs.push_back(ground_truth_v);
 	}
 
 	if(args.brief_out) {
+		std::cout << "ground_truth_path_loss|list(float)|";
+		for(unsigned int i = 0; i < ground_truth_path_loss.size(); ++i) {
+			std::cout << ground_truth_path_loss[i];
+			if(i < ground_truth_path_loss.size() - 1) {
+				std::cout << ",";
+			}
+		}
+		std::cout << std::endl;
+
 		if(!args.skip_s2pc) {
 			std::cout << "su_transmit_power(secure,plain,ground)|list(float,float,float)|";
 		} else {
@@ -142,6 +155,8 @@ int main(int argc, char const *argv[]) {
 	} else {
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
 			std::cout << "--------------------" << std::endl;
+			std::cout << "GT PL:      " << ground_truth_path_loss[i] << std::endl;
+
 			if(!args.skip_s2pc) {
 				std::cout << "Secure:     " << secure_vs[i] << std::endl;
 			}

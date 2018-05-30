@@ -83,17 +83,17 @@ void Generator::generateEntities(
 	}
 }
 
-float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus) const {
+float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus, float* ground_truth_path_loss) const {
 	float tp = 0.0;
 	bool first = true;
 	for(unsigned int i = 0; i < pus.size(); ++i) {
 		for(unsigned int j = 0; j < pus[i].prs.size(); ++j) {
 			float this_tp = 0.0;
+			float this_pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);;
 			if(utils::unit_type == utils::UnitType::ABS) {
-				this_tp = pus[i].prs[j].threshold / pm->getPathLoss(su.loc, pus[i].prs[j].loc);
+				this_tp = pus[i].prs[j].threshold / this_pl;
 			} else if(utils::unit_type == utils::UnitType::DB) {
-				float pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);
-				this_tp = pus[i].prs[j].threshold - pl;
+				this_tp = pus[i].prs[j].threshold - this_pl;
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);
@@ -101,8 +101,16 @@ float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus) co
 			if(first) {
 				tp = this_tp;
 				first = false;
+
+				if(ground_truth_path_loss != nullptr) {
+					*ground_truth_path_loss = this_pl;
+				}
 			} else if(this_tp < tp) {
 				tp = this_tp;
+
+				if(ground_truth_path_loss != nullptr) {
+					*ground_truth_path_loss = this_pl;
+				}
 			}
 		}
 	}
