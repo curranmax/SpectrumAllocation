@@ -74,22 +74,32 @@ void Generator::generateEntities(
 	}
 
 	// SU
+	float su_buffer = 0.0;
 	for(int i = 0; i < num_su; ++i) {
-		float x = utils::randomFloat(location_range / 5.0, 4.0 * location_range / 5.0);
-		float y = utils::randomFloat(0.0, location_range);
+		float x = utils::randomFloat(su_buffer, location_range - su_buffer);
+		float y = utils::randomFloat(su_buffer, location_range - su_buffer);
 		float su_height = 10.0;
+
+		Location su_loc(x, y, su_height);
+
 		SU su(Location(x, y, su_height));
 		(*sus).push_back(su);
+
 	}
 }
 
-float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus, float* ground_truth_path_loss) const {
+float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus) const {
 	float tp = 0.0;
 	bool first = true;
 	for(unsigned int i = 0; i < pus.size(); ++i) {
 		for(unsigned int j = 0; j < pus[i].prs.size(); ++j) {
 			float this_tp = 0.0;
-			float this_pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);;
+			float this_pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);
+			float rev_pl = pm->getPathLoss(su.loc, pus[i].prs[j].loc);
+			if(fabs(this_pl - rev_pl) / fabs(this_pl) >= 0.01) {
+				std::cerr << "Path loss isn't symmetric (GT)" << std::endl;
+				exit(1);
+			}
 			if(utils::unit_type == utils::UnitType::ABS) {
 				this_tp = pus[i].prs[j].threshold / this_pl;
 			} else if(utils::unit_type == utils::UnitType::DB) {
@@ -101,16 +111,8 @@ float Generator::computeGroundTruth(const SU& su, const std::vector<PU>& pus, fl
 			if(first) {
 				tp = this_tp;
 				first = false;
-
-				if(ground_truth_path_loss != nullptr) {
-					*ground_truth_path_loss = this_pl;
-				}
 			} else if(this_tp < tp) {
 				tp = this_tp;
-
-				if(ground_truth_path_loss != nullptr) {
-					*ground_truth_path_loss = this_pl;
-				}
 			}
 		}
 	}
@@ -135,8 +137,6 @@ float LongleyRicePM::getPathLoss(const Location& loc1, const Location& loc2) con
 	// Changes directory to splat folder
 	chdir(splat_dir.c_str());
 
-	// SDF dir
-
 	// Convert location to longitude and lattitude
 	float loc1_lat  = ref_lat  + (loc1.y / EARTH_RADIUS) * (180.0 / M_PI);
 	float loc1_long = ref_long + (loc1.x / EARTH_RADIUS) * (180.0 / M_PI) / cos(ref_lat * M_PI / 180.0);
@@ -149,17 +149,17 @@ float LongleyRicePM::getPathLoss(const Location& loc1, const Location& loc2) con
 	std::string loc2_fname = "loc2.qth";
 
 	std::ofstream loc1_qth(loc1_fname);
-	loc1_qth << "Loc1" << std::endl << loc1_lat << std::endl << loc1_long << std::endl << loc1.z << " m" << std::endl;
+	loc1_qth << "Loc1" << std::endl << loc1_lat << std::endl << loc1_long << std::endl << loc1.z << "m" << std::endl;
 	loc1_qth.close();
 
 	std::ofstream loc2_qth(loc2_fname);
-	loc2_qth << "Loc2" << std::endl << loc2_lat << std::endl << loc2_long << std::endl << loc2.z << " m" << std::endl;
+	loc2_qth << "Loc2" << std::endl << loc2_lat << std::endl << loc2_long << std::endl << loc2.z << "m" << std::endl;
 	loc2_qth.close();
 
 	// Run the splat command
 	std::stringstream sstr;
 	float timeout_seconds = 300;
-	sstr << "timeout " << timeout_seconds << "s splat-hd -t " << loc1_fname << " -r " << loc2_fname << " -d " << sdf_dir << " -L -metric -R 10 > /dev/null 2>&1";
+	sstr << "timeout " << timeout_seconds << "s " << splat_cmd << " -t " << loc1_fname << " -r " << loc2_fname << " -d " << sdf_dir << " -L -metric -R 10 > /dev/null 2>&1";
 
 	int sys_code = 1;
 	int num_tries = 2;
@@ -168,7 +168,8 @@ float LongleyRicePM::getPathLoss(const Location& loc1, const Location& loc2) con
 	}
 
 	if(sys_code != 0) {
-		std::cerr << "Unable to run Splat-hd" << std::endl;
+		std::cerr << "Unable to run Splat, sys-code: " << sys_code << std::endl;
+		std::cerr << "Command used: " << sstr.str() << std::endl;
 		exit(1);
 	}
 
@@ -192,15 +193,20 @@ float LongleyRicePM::getPathLoss(const Location& loc1, const Location& loc2) con
 	chdir(return_dir.c_str());
 
 	// Returns the greater of the two values.
-	float rv = free_space_loss;
-	if(itwom_loss > rv) {
-		rv = itwom_loss;
+	float path_loss = free_space_loss;
+	if(use_itwom_pl && itwom_loss > path_loss) {
+		path_loss = itwom_loss;
+	}
+
+	float low_pl_thresh = 55.0;
+	if(path_loss <= low_pl_thresh) {
+		path_loss = low_pl_thresh;
 	}
 
 	if(utils::unit_type == utils::UnitType::ABS) {
-		return utils::fromdBm(-rv);
+		return utils::fromdBm(-path_loss);
 	} else if(utils::unit_type == utils::UnitType::DB) {
-		return -rv;
+		return -path_loss;
 	} else {
 		std::cerr << "Unsupported unit_type" << std::endl;
 		exit(1);

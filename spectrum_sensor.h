@@ -18,26 +18,27 @@ public:
 
 	Location loc;
 
-	// In mW
 	float received_power;
 };
 
 class SpectrumSensorInt {
 public:
-	SpectrumSensorInt() : loc(), received_power(0.0) {}
-	SpectrumSensorInt(const LocInt& _loc, int _received_power) : loc(_loc), received_power(_received_power) {}
-	SpectrumSensorInt(const SpectrumSensorInt& ss) : loc(ss.loc), received_power(ss.received_power) {}
+	SpectrumSensorInt() : loc(), received_power(0.0), received_power_from_pu() {}
+	SpectrumSensorInt(const LocInt& _loc, int _received_power) : loc(_loc), received_power(_received_power), received_power_from_pu() {}
+	SpectrumSensorInt(const SpectrumSensorInt& ss) : loc(ss.loc), received_power(ss.received_power), received_power_from_pu(ss.received_power_from_pu) {}
 
 	const SpectrumSensorInt& operator=(const SpectrumSensorInt& ss) {
 		this->loc = ss.loc;
 		this->received_power = ss.received_power;
+		this->received_power_from_pu = ss.received_power_from_pu;
 		return *this;
 	}
 
 	LocInt loc;
 
-	// In mW
 	int received_power;
+
+	std::vector<int> received_power_from_pu;
 };
 
 typedef SpectrumSensor SS;

@@ -5,21 +5,19 @@ from datetime import datetime, timedelta
 import itertools
 from operator import mul
 from copy import deepcopy
+import math
 
 # Experiments
 TEST = 'test'
 
-SMALL_LD_VARY_NUM_SS_SELECT = 'vary_ss_select'
-SMALL_LD_VARY_RP_ALPHA = 'vary_rp_alpha'
-SMALL_LD_VARY_PL_ALPHA = 'vary_pl_alpha'
-SMALL_LD_VARY_RP_AND_PL_ALPHA = 'vary_rp_and_pl_alpha'
+VARY_NUM_SS_SELECT = 'vary_ss_select'
 
-SMALL_LD_VARY_NUM_SS_SELECT_AND_ALPHAS = 'vary_ss_select_and_alphas'
+MED_TEST = 'med_test'
+LARGE_TEST = 'large_test'
 
 ALL_EXPERIMENT_IDS = [TEST,
-						SMALL_LD_VARY_NUM_SS_SELECT,
-						SMALL_LD_VARY_RP_ALPHA, SMALL_LD_VARY_PL_ALPHA, SMALL_LD_VARY_RP_AND_PL_ALPHA,
-						SMALL_LD_VARY_NUM_SS_SELECT_AND_ALPHAS]
+						VARY_NUM_SS_SELECT,
+						MED_TEST, LARGE_TEST]
 
 # Change parameters
 NUM_SS_SELECTION = 'num_ss_selection'
@@ -45,6 +43,8 @@ def makeDefaultExperimentParam():
 	param.ld_dist0 = None
 	param.ld_gamma = None
 
+	param.splat_cmd = 'splat'
+
 	param.ref_lat = 40.75
 	param.ref_long = 73.25
 
@@ -54,7 +54,15 @@ def makeDefaultExperimentParam():
 
 	param.num_ss_selection = 0
 	param.num_pu_selection = 0
+
+	param.do_plaintext_split = False
+
 	param.algo_order = 'split_then_idw'
+	param.selection_algo = 'sort'
+
+	param.grid_x = 0
+	param.grid_y = 0
+
 	param.ss_receive_power_alpha = 1
 	param.ss_path_loss_alpha = 1
 
@@ -82,6 +90,8 @@ class ExperimentParam:
 		self.ld_dist0 = None
 		self.ld_gamma = None
 
+		self.splat_cmd = None
+
 		self.ref_lat = None
 		self.ref_long = None
 
@@ -92,8 +102,14 @@ class ExperimentParam:
 		self.num_ss_selection = None
 		self.num_pu_selection = None
 
+		self.do_plaintext_split = None
+
 		self.algo_order = None
+		self.selection_algo = None
 		self.path_loss_type = None
+
+		self.grid_x = None
+		self.grid_y = None
 
 		self.ss_receive_power_alpha = None
 		self.ss_path_loss_alpha = None
@@ -120,11 +136,12 @@ def makeExperimentResult(vals):
 
 class ExperimentResult:
 	def __init__(self):
-		ground_truth_path_loss = None
-		preprocess_time = None
-		su_transmit_power = None
-		rand_seed = None
-		time_per_request = None
+		self.ground_truth_path_loss = None
+		self.su_to_pu_dist = None
+		self.preprocess_time = None
+		self.su_transmit_power = None
+		self.rand_seed = None
+		self.time_per_request = None
 
 	def getCols(self):
 		# each value is a 3 tuple (var_name, var_name_for_output, val_type)
@@ -139,6 +156,15 @@ class ExperimentResult:
 				x = (k, None, 'float')
 			elif isinstance(getattr(self, k), str):
 				x = (k, None, 'str')
+			elif isinstance(getattr(self, k), list):
+				if len(getattr(self,k)) == 0:
+					x = (k, None, 'list(float)')
+				elif isinstance(getattr(self, k)[0], int):
+					x = (k, None, 'list(int)')
+				elif isinstance(getattr(self, k)[0], float):
+					x = (k, None, 'list(float)')
+				elif isinstance(getattr(self, k)[0], str):
+					x = (k, None, 'list(str)')
 			elif isinstance(getattr(self, k), dict) \
 					and all(isinstance(label, str) and isinstance(vals, list) \
 							and all(isinstance(v, float) for v in vals) \
@@ -150,8 +176,17 @@ class ExperimentResult:
 		return cols
 
 	def getStr(self, var_name, var_order):
+		if var_name not in vars(self) or getattr(self, var_name) == None:
+				return 'None'
+
 		if var_order == None:
-			return str(getattr(self, var_name))
+			if isinstance(getattr(self, var_name), list):
+				if len(getattr(self, var_name)) > 0:
+					return ','.join(map(str, getattr(self, var_name)))
+				else:
+					return ','
+			else:
+				return str(getattr(self, var_name))
 		
 		return ','.join(':'.join(map(str, vs)) for vs in zip(*tuple(getattr(self, var_name)[label] for label in var_order)))
 
@@ -235,17 +270,27 @@ def readInParamResult(filenames):
 
 def runExperiment(param, no_run = False):
 	args = ['../s2pc', '-brief_out']
-	vs =[(param.rand_seed, 'rand_seed'), (param.skip_s2pc, 'skip_s2pc'),
-			(param.num_pu, 'npu'), (param.num_ss, 'nss'), (param.num_su, 'nsu'), (param.location_range, 'lr'),
-			(param.unit_type, 'ut'),
-			(param.propagation_model, 'pm'),
-			(param.ld_path_loss0, 'ld_pl0'), (param.ld_dist0, 'ld_d0'), (param.ld_gamma, 'ld_g'),
-			(param.ref_lat, 'ref_lat'), (param.ref_long, 'ref_long'),
-			(param.splat_dir, 'splat_dir'), (param.sdf_dir, 'sdf_dir'), (param.return_dir, 'return_dir'), 
-			(param.num_ss_selection, 'nss_s'), (param.num_ss_selection, 'npu_s'),
-			(param.algo_order, 'ao'), (param.path_loss_type, 'plt'),
-			(param.ss_receive_power_alpha, 'rpa'), (param.ss_path_loss_alpha, 'pla'),
-			(param.num_float_bits, 'float_bits'), (param.s2_pc_bit_count, 'bit_count')]
+
+	var_flag_names = {'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
+						'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
+						'unit_type': 'ut', 'propagation_model': 'pm',
+						'ld_path_loss0': 'ld_pl0', 'ld_dist0': 'ld_d0', 'ld_gamma': 'ld_g',
+						'splat_cmd': 'splat_cmd', 'ref_lat': 'ref_lat', 'ref_long': 'ref_long',
+						'splat_dir': 'splat_dir', 'sdf_dir': 'sdf_dir', 'return_dir': 'return_dir',
+						'num_ss_selection': 'nss_s', 'num_pu_selection': 'npu_s',
+						'do_plaintext_split': 'do_pt_split',
+						'algo_order': 'ao', 'selection_algo': 'sel_algo', 'path_loss_type': 'plt',
+						'grid_x': 'grid_x', 'grid_y': 'grid_y',
+						'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
+						'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count'}
+
+	# Check that all attrs have flags
+	vs = []
+	for attr in vars(param):
+		if attr not in var_flag_names:
+			raise Exception('No flag for attr ' + attr)
+
+		vs.append((getattr(param, attr), var_flag_names[attr]))
 
 	for val, flag in vs:
 		if val != None:
@@ -259,21 +304,24 @@ def runExperiment(param, no_run = False):
 		print ' '.join(args)
 	else:
 		rv = None
-		for i in range(10):
+		for i in range(2):
 			process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 			process.wait()
+
+			if process.returncode != 0:
+				if process.returncode == -9:
+					print bcolors.FAIL + bcolors.BOLD + bcolors.UNDERLINE + 'Experiment Killed' + bcolors.ENDC
+				else:
+					print bcolors.FAIL + bcolors.BOLD + bcolors.UNDERLINE + 'Experiment failed with returncode: ' + str(process.returncode) + bcolors.ENDC
 
 			# If there is any output to stderr, its assumed that something went wrong, and the experiment must be run again.
 			err_out = [v for v in process.stderr]
 			if len(err_out) != 0:
-				print 'Encountered error, trying again'
+				print 'Encountered error:\n', ''.join(err_out)
 				continue
 
 			rv = makeExperimentResult([v[:-1] for v in process.stdout])
 			break
-
-		if rv == None:
-			raise Exception('Unable to run program, got:\n' + ''.join(err_out))
 
 		return rv
 
@@ -343,10 +391,10 @@ def getType(value):
 	raise Exception('Can\'t determine the type of: ' + str(value))
 
 def convert(var_name, val_type, val_str):
-	if val_type == 'None':
+	if val_type == 'None' or val_str == 'None':
 		return var_name, None
 	if val_type == 'bool':
-		return var_name, bool(val_str)
+		return var_name, val_str == 'True'
 	if val_type == 'int':
 		return var_name, int(val_str)
 	if val_type == 'float':
@@ -358,6 +406,8 @@ def convert(var_name, val_type, val_str):
 	if val_type == 'list(int)':
 		return var_name, list(map(int, val_str.split(',')))
 	if val_type == 'list(float)':
+		if val_str == '' or val_str == ',':
+			return var_name, []
 		return var_name, list(map(float, val_str.split(',')))
 	if val_type == 'list(str)':
 		return var_name, list(map(str, val_str.split(',')))
@@ -387,9 +437,13 @@ if __name__ == '__main__':
 	current_time = datetime.now()
 
 	parser.add_argument('-exp', '--experiment_identifier', metavar = 'EXPERIMENT_ID', type = str, nargs = '+', default = [], help = 'List of experiments to run. Must be value in (' + ', '.join(ALL_EXPERIMENT_IDS) + ')')
+	parser.add_argument('-name', '--name_of_experiment', metavar = 'NAME', type = str, nargs = 1, default = [None], help = 'Includes the name in the output file')
 	parser.add_argument('-out', '--out_file', metavar = 'OUT_FILE', type = str, nargs = 1, default = [None], help = 'File to write data to')
 	parser.add_argument('-nt', '--num_tests', metavar = 'NUM_TESTS', type = int, nargs = 1, default = [1], help = 'Number of tests to run')
 	parser.add_argument('-skip', '--skip_s2pc', action = 'store_true', help = 'If given, skips the s2pc algorithm')
+	parser.add_argument('-hd', '--use_splat_hd', action = 'store_true', help = 'If given, uses splat-hd instead of splat')
+
+	parser.add_argument('-nr', '--no_run', action = 'store_true', help = 'If given, doesn\'t run the tests, simply outputs the commands')
 
 	args = parser.parse_args()
 	experiments = args.experiment_identifier
@@ -398,19 +452,30 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1], 'num_pu_selection': [1], 'num_pu': [2], 'num_ss':[50], 'num_su':[2]})
-		if experiment == SMALL_LD_VARY_NUM_SS_SELECT:
-			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], 'propagation_model': ['longley_rice'],
-							'num_pu': [1], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [100.0], 'num_ss': [100], 'unit_type': ['db']})
-		if experiment == SMALL_LD_VARY_RP_ALPHA:
-			changes.append({RP_ALPHA: [1, 2, 3, 4]})
-		if experiment == SMALL_LD_VARY_PL_ALPHA:
-			changes.append({PL_ALPHA: [1, 2, 3, 4]})
-		if experiment == SMALL_LD_VARY_RP_AND_PL_ALPHA:
-			changes.append({RP_ALPHA: [1, 2, 3, 4], PL_ALPHA: [1, 2, 3, 4]})
-		if experiment == SMALL_LD_VARY_NUM_SS_SELECT_AND_ALPHAS:
-			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-							RP_ALPHA: [1, 2, 3, 4], PL_ALPHA: [1, 2, 3, 4]})
+			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], ('grid_x', 'grid_y', 'selection_algo'): [(500, 500, 'none')],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [10], 'ld_gamma': [0.25],
+							'num_pu': [25], PL_ALPHA: [2], RP_ALPHA: [2],
+							'location_range': [500.0], 'num_ss': [2500], 'num_su': [100], 'unit_type': ['db']})
+		if experiment == VARY_NUM_SS_SELECT:
+			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
+							'propagation_model': ['longley_rice'],
+							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
+							'num_su': [100]})
+		if experiment == MED_TEST:
+			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], 'num_pu_selection': [1, 5, 10],
+							('num_pu', 'num_ss', 'location_range', 'grid_x', 'grid_y'):
+								[(int(math.ceil(400 / (10000.0 * 10000.0) * x * x)),
+								int(math.ceil(4000 / (10000.0 * 10000.0) * x * x)),
+								x,
+								int(x / 10),
+								int(x / 10)) for x in (2000.0,)],
+							'propagation_model': ['longley_rice'],
+							PL_ALPHA: [2], RP_ALPHA: [2], 'unit_type': ['db']})
+		if experiment == LARGE_TEST:
+			changes.append({NUM_SS_SELECTION: [25], 'num_pu_selection': [1, 50, 100, 200, 300, 400], ('grid_x', 'grid_y'): [(100, 100)],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [10], 'ld_gamma': [0.25],
+							'num_pu': [1, 25, 50, 100, 200, 300, 400], 'num_ss': [4000], 'num_su': [10],
+							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'], 'do_plaintext_split': [True]})
 
 	num_experiments = sum(reduce(mul, [len(vals) for _, vals in change.iteritems()]) for change in changes) * args.num_tests[0]
 
@@ -423,21 +488,28 @@ if __name__ == '__main__':
 			ns = change.keys()
 			for vs in itertools.product(*tuple(vs for k, vs in change.iteritems())):
 				print 'Running experiment', exp_num, 'of', num_experiments, 'with parameters:', ns, vs
-				exp_num += 1
-
+				
 				param = makeDefaultExperimentParam()
 
 				if args.skip_s2pc:
 					param.skip_s2pc = True
 
+				if args.use_splat_hd:
+					param.splat_cmd = 'splat-hd'
+
 				for n, v in zip(ns, vs):
-					vars(param)[n] = v
+					if isinstance(n, tuple):
+						for a, b in zip(n, v):
+							vars(param)[a] = b
+					else:
+						vars(param)[n] = v
 
 				start = datetime.now()
 				if begin_time == None:
 					begin_time = start
-				result = runExperiment(param)
-				out_values.append((param, result))
+				result = runExperiment(param, no_run = args.no_run)
+				if result != None:
+					out_values.append((param, result))
 				end = datetime.now()
 				durs.append(end - start)
 
@@ -452,11 +524,14 @@ if __name__ == '__main__':
 						expected_end_str = expected_end.strftime('%A %b %-d %-I:%M:%S.%f %p')
 
 					print 'Expected end at', bcolors.BOLD + bcolors.OKGREEN + expected_end_str + bcolors.ENDC
+				exp_num += 1
 
+	print 'All Experiments took', bcolors.BOLD + bcolors.WARNING + str(end - begin_time) + bcolors.ENDC
 
-	out_file = args.out_file[0]
-	if out_file == None:
-		out_file = current_time.strftime('data/out_%b-%d_%H:%M:%S_' + '-'.join(experiments) + '.txt')
+	if len(out_values) > 0:
+		out_file = args.out_file[0]
+		if out_file == None:
+			out_file = current_time.strftime('data/out_%b-%d_%H:%M:%S_' + (args.name_of_experiment[0] if args.name_of_experiment[0] != None else '-'.join(experiments)) + '.txt')
 
-	writeOutParamResult(out_file, out_values)
+		writeOutParamResult(out_file, out_values)
 	

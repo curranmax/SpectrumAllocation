@@ -47,6 +47,29 @@ void utils::dist(sInt* dist, const sInt& x1, const sInt& y1, const sInt& x2, con
 				num_iters, two);
 }
 
+void utils::secureLog10(
+		sInt* ans, const sInt& v,
+		const sInt& zero, const sInt& factor_int, const sInt& ln_10,
+		int num_iters) {
+	*ans = zero + zero;
+
+	sInt num   = v - factor_int;
+	sInt denom = factor_int + zero;
+	sInt sign  = factor_int + zero;
+
+	for(int i = 0; i < num_iters; ++i) {
+		*ans = (*ans) + sign * num / denom;
+
+		if(i < num_iters - 1) {
+			num   = num * (v - factor_int) / factor_int;
+			denom = denom + factor_int;
+			sign  = zero - sign;
+		}
+	}
+
+	*ans = factor_int * (*ans) / ln_10;
+}
+
 float utils::todBm(float rp_in_mW) {
 	return 10.0 * log10(rp_in_mW);
 }

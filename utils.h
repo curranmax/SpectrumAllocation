@@ -29,6 +29,12 @@ void sqrt(sInt* guess, const sInt& v, int num_iters, const sInt& two);
 void dist(sInt* dist, const sInt& x1, const sInt& y1, const sInt& x2, const sInt& y2,
 			const sInt& zero, const sInt& two, int num_iters);
 
+// Only works for values between 0 and 2, and is less accurate near the edges.
+void secureLog10(
+	sInt* ans, const sInt& v,
+	const sInt& zero, const sInt& factor_int, const sInt& ln_10,
+	int num_iters);
+
 float todBm(float rp_in_mW);
 float fromdBm(float rp_in_dBm);
 

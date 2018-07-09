@@ -18,6 +18,7 @@
 #include <vector>
 #include <math.h>
 #include <sstream>
+#include <algorithm>
 
 int main(int argc, char const *argv[]) {
 	Args args(argc, argv);
@@ -39,8 +40,9 @@ int main(int argc, char const *argv[]) {
 	if(args.propagation_model == "log_distance") {
 		pm = new LogDistancePM(args.ld_path_loss0, args.ld_dist0, args.ld_gamma);
 	} else if (args.propagation_model == "longley_rice") {
-		pm = new LongleyRicePM(args.ref_lat, args.ref_long,
-								args.splat_dir, args.sdf_dir, args.return_dir);
+		pm = new LongleyRicePM(args.splat_cmd, args.ref_lat, args.ref_long,
+								args.splat_dir, args.sdf_dir, args.return_dir,
+								args.use_itwom_pl);
 	} else {
 		std::cerr << "Unknown propagation model: " << args.propagation_model << std::endl;
 		exit(0);
@@ -56,6 +58,13 @@ int main(int argc, char const *argv[]) {
 	float factor = 1 << args.num_float_bits;
 	SM sm(factor, args.num_ss_selection, args.num_pu_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
 	sm.setAlgoOrder(args.algo_order);
+	sm.setSelectionAlgo(args.selection_algo);
+
+	if(args.grid_num_x > 0 && args.grid_num_y > 0) {
+		sm.setGridParams(args.num_ss_selection,
+				args.grid_num_x, args.grid_num_y,
+				args.location_range / args.grid_num_x, args.location_range / args.grid_num_y);
+	}
 
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
@@ -86,16 +95,31 @@ int main(int argc, char const *argv[]) {
 			sus_int1.push_back(su_split.second);
 		}
 
+		if(args.do_plaintext_split) {
+			t1.start(Timer::plaintext_split_preprocessing);
+
+			sm.plainTextRadarPreprocess(pus, sss, &sss_int0, &sss_int1);
+
+			t1.end(Timer::plaintext_split_preprocessing);
+		}
+
+		std::map<int, std::vector<int> > precomputed_ss_int_groups;
+		if(sm.useGrid()) {
+			t1.start(Timer::plaintext_grid_preprocessing);
+			precomputed_ss_int_groups = sm.plainTextGrid(sss);
+			t1.end(Timer::plaintext_grid_preprocessing);
+		}
+
 		NullTimer null_timer;
 
 		std::thread thrd0([&]() {
-			int party_id = 0;
-			secure_vs_a = sm.run(party_id, pus_int0, sss_int0, sus_int0, &t1);
+			int party_id = 0; 
+			secure_vs_a = sm.run(party_id, pus_int0, sss_int0, sus_int0, precomputed_ss_int_groups, &t1);
 		});
 
 		std::thread thrd1([&]() {
-			int party_id = 1;
-			secure_vs_b = sm.run(party_id, pus_int1, sss_int1, sus_int1, &null_timer);
+			int party_id = 1; 
+			secure_vs_b = sm.run(party_id, pus_int1, sss_int1, sus_int1, precomputed_ss_int_groups, &null_timer);
 		});
 
 		thrd0.join();
@@ -103,35 +127,19 @@ int main(int argc, char const *argv[]) {
 	}
 
 	std::vector<float> secure_vs;
-	std::vector<float> plaintext_vs;
+	std::vector<float> plaintext_vs = sm.plainTextRun(sus, pus, sss, &t1);
 	std::vector<float> ground_truth_vs;
-	std::vector<float> ground_truth_path_loss;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		if(!args.skip_s2pc) {
 			float secure_v = secure_vs_a[i] + secure_vs_b[i];
 			secure_vs.push_back(secure_v);
 		}
 
-		float plaintext_v = sm.plainTextRadar(sus[i], pus, sss);
-		float this_gt_pl = 0.0;
-		float ground_truth_v = gen.computeGroundTruth(sus[i], pus, &this_gt_pl);
-
-		ground_truth_path_loss.push_back(this_gt_pl);
-
-		plaintext_vs.push_back(plaintext_v);
+		float ground_truth_v = gen.computeGroundTruth(sus[i], pus);
 		ground_truth_vs.push_back(ground_truth_v);
 	}
 
 	if(args.brief_out) {
-		std::cout << "ground_truth_path_loss|list(float)|";
-		for(unsigned int i = 0; i < ground_truth_path_loss.size(); ++i) {
-			std::cout << ground_truth_path_loss[i];
-			if(i < ground_truth_path_loss.size() - 1) {
-				std::cout << ",";
-			}
-		}
-		std::cout << std::endl;
-
 		if(!args.skip_s2pc) {
 			std::cout << "su_transmit_power(secure,plain,ground)|list(float,float,float)|";
 		} else {
@@ -149,14 +157,12 @@ int main(int argc, char const *argv[]) {
 		std::cout << std::endl;
 
 		if(!args.skip_s2pc) {
-			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) << std::endl;
+			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "time_per_request|float|" << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 		}
 	} else {
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
 			std::cout << "--------------------" << std::endl;
-			std::cout << "GT PL:      " << ground_truth_path_loss[i] << std::endl;
-
 			if(!args.skip_s2pc) {
 				std::cout << "Secure:     " << secure_vs[i] << std::endl;
 			}
@@ -174,7 +180,7 @@ int main(int argc, char const *argv[]) {
 		}
 
 		if(!args.skip_s2pc) {
-			std::cout << "Average duration of " << Timer::secure_preprocessing << ": " << t1.getAverageDuration(Timer::secure_preprocessing) << std::endl;
+			std::cout << "Average duration of " << Timer::secure_preprocessing << ": " << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "Average duration of " << Timer::secure_su_request << ": " << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 		}
 	}

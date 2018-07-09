@@ -19,6 +19,9 @@ public:
 
 	static const std::string secure_preprocessing;
 	static const std::string secure_su_request;
+
+	static const std::string plaintext_split_preprocessing;
+	static const std::string plaintext_grid_preprocessing;
 private:
 	std::string current_tag;
 	std::chrono::time_point<std::chrono::high_resolution_clock> current_start;

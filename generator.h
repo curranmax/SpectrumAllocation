@@ -32,7 +32,7 @@ public:
 	void generateEntities(int num_pu, int num_ss, int num_su,
 						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const;
 
-	float computeGroundTruth(const SU& su, const std::vector<PU>& pus, float* ground_truth_path_loss) const;
+	float computeGroundTruth(const SU& su, const std::vector<PU>& pus) const;
 
 private:
 	float location_range;
@@ -56,18 +56,28 @@ private:
 class LongleyRicePM : public PropagationModel {
 public:
 	LongleyRicePM() = delete;
-	LongleyRicePM(float _ref_lat, float _ref_long,
-					const std::string _splat_dir, const std::string _sdf_dir, const std::string _return_dir)
-			: PropagationModel(), ref_lat(_ref_lat), ref_long(_ref_long), splat_dir(_splat_dir), sdf_dir(_sdf_dir), return_dir(_return_dir) {}
+	LongleyRicePM(const std::string _splat_cmd, float _ref_lat, float _ref_long,
+					const std::string _splat_dir, const std::string _sdf_dir, const std::string _return_dir,
+					bool _use_itwom_pl)
+			: PropagationModel(), splat_cmd(_splat_cmd), ref_lat(_ref_lat), ref_long(_ref_long), splat_dir(_splat_dir), sdf_dir(_sdf_dir), return_dir(_return_dir), use_itwom_pl(_use_itwom_pl) {
+		if(splat_cmd != "splat" && splat_cmd != "splat-hd") {
+			std::cerr << "LR command must be either 'splat' or 'splat-hd', got: " << splat_cmd << std::endl;
+			exit(1);
+		}
+	}
 	LongleyRicePM(const LongleyRicePM& lr) = delete;
 	~LongleyRicePM() {}
 
 	float getPathLoss(const Location& loc1, const Location& loc2) const;
 
 private:
+	std::string splat_cmd;
+
 	float ref_lat, ref_long;
 
 	std::string splat_dir, sdf_dir, return_dir;
+
+	bool use_itwom_pl;
 };
 
 #endif

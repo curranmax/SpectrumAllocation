@@ -40,6 +40,7 @@ class Args {
 
 	bool skip_s2pc;
 
+
 	// Generation params
 	int num_pu;
 	int num_ss;
@@ -57,6 +58,8 @@ class Args {
 	float ld_gamma;
 
 	// Longley-Rice Params
+	std::string splat_cmd;
+
 	float ref_lat;
 	float ref_long;
 
@@ -64,11 +67,19 @@ class Args {
 	std::string sdf_dir;
 	std::string return_dir;
 
+	bool use_itwom_pl;
+
 	// Spectrum Manager params
 	int num_ss_selection;
 	int num_pu_selection;
 
+	bool do_plaintext_split;
+	
 	std::string algo_order;
+	std::string selection_algo;
+
+	// Grid params
+	int grid_num_x, grid_num_y;
 
 	// TODO allow this to be a floating point value
 	int ss_receive_power_alpha;
