@@ -19,7 +19,7 @@ std::pair<int, int> splitInt(int v) {
 }
 
 int splitRandVal() {
-	return rand();
+	return rand() % (1 << 16) - (1 << 15);
 }
 
 std::pair<Location, Location> splitLocation(const Location& loc) {
