@@ -1,5 +1,4 @@
 
-
 SA_PATH = /home/curranmax/Documents/Research/spectrum_allocation
 
 INC_PATH = -I $(SA_PATH)/Ivory-Runtime -I $(SA_PATH)/libOTe -I $(SA_PATH)/libOTe/cryptoTools -I $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/ -I $(SA_PATH)/itm/c/
@@ -20,7 +19,7 @@ SOURCES = main.cpp spectrum_manager.cpp generator.cpp args.cpp location.cpp spli
 OBJECTS = $(SOURCES:.cpp=.o)
 NAME = s2pc
 
-all: clean $(NAME)
+all: $(NAME)
 
 $(NAME): $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $(LIB_PATH) -o $(NAME)
