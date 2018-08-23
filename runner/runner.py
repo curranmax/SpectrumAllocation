@@ -509,7 +509,7 @@ if __name__ == '__main__':
 			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['gen_out/data1.txt']})
+							'out_filename': ['../gen_out/data1.txt']})
 
 	num_experiments = sum(reduce(mul, [len(vals) for _, vals in change.iteritems()]) for change in changes) * args.num_tests[0]
 
