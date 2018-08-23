@@ -1,16 +1,15 @@
 
 SA_PATH = ..
 
-INC_PATH = -I $(SA_PATH)/Ivory-Runtime -I $(SA_PATH)/libOTe -I $(SA_PATH)/libOTe/cryptoTools -I $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/ -I $(SA_PATH)/itm/c/
+INC_PATH = -I $(SA_PATH)/Ivory-Runtime -I $(SA_PATH)/libOTe -I $(SA_PATH)/libOTe/cryptoTools -I $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/
 
 IVORY_LIB = -L $(SA_PATH)/Ivory-Runtime/lib -l ivory
 LIBOTE_LIB = -L $(SA_PATH)/libOTe/lib -l libOTe -l cryptoTools
 BOOST_LIB = -L $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/boost/stage/lib -l boost_system -l boost_thread
 MIRACL_LIB = -L $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/miracl/miracl/source -l miracl
-ITM_LIB = -L $(SA_PATH)/itm/c/ -l itm
 OTHER_LIB = -l pthread
 
-LIB_PATH = $(IVORY_LIB) $(LIBOTE_LIB) $(BOOST_LIB) $(MIRACL_LIB) $(ITM_LIB) $(OTHER_LIB)
+LIB_PATH = $(IVORY_LIB) $(LIBOTE_LIB) $(BOOST_LIB) $(MIRACL_LIB) $(OTHER_LIB)
 
 CC = g++
 CFLAGS = -Wall -std=c++14 $(INC_PATH)

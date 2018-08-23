@@ -1,8 +1,6 @@
 
 #include "generator.h"
 
-#include "itm.hpp"
-
 #include "timer.h"
 #include "location.h"
 #include "primary_user.h"
