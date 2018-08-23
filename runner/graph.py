@@ -12,6 +12,11 @@ class Point:
 		self.y = y
 		self.group = group
 
+class CdfPoint:
+	def __init__(self, val, group):
+		self.val = val
+		self.group = group
+
 def groupValues(raw_values, xv, xfunc, yv, yfunc, gv, fv):
 	points = []
 	for param, result in raw_values:
@@ -55,7 +60,56 @@ def groupValues(raw_values, xv, xfunc, yv, yfunc, gv, fv):
 		data[p.group][p.x].append(p.y)
 	return data
 
-def plotData(data, reduce_function = None, include_errbars = False, scatter_plot = False, title = None, xlabel = None, ylabel = None):
+def groupCdfValues(raw_values, cdfv, cdffunc, gv, fv):
+	values = []
+	for param, result in raw_values:
+		skip = False
+		for f_var in fv:
+			this_v = param.getValue(f_var)
+			if this_v not in fv[f_var]:
+				skip = True
+
+		if skip:
+			continue
+
+		this_group = tuple(getattr(param, g) for g in gv)
+
+		tmp_val = tuple((result.getValue(c) if result.hasAttr(c) else param.getValue(c)) for c in cdfv)
+		if any(isinstance(k, list) for k in tmp_val):
+			lens = [len(k) for k in tmp_val if isinstance(k, list)]
+			if any(v != lens[0] for v in lens):
+				raise Exception('All lists must be of same length')
+
+			tmp_val = [(k if isinstance(k, list) else [k] * lens[0]) for k in tmp_val]
+
+			for vs in zip(*tmp_val):
+				if None not in vs:
+					this_val = cdffunc(*vs)
+					values.append(CdfPoint(this_val, this_group))
+		else:
+			if None not in tmp_val:
+				this_val = yfunc(*tmp_val)
+				values.append(CdfPoint(this_val, this_group))
+
+	groups = set(p.group for p in values)
+	data = {group:[] for group in groups}
+	for p in values:
+		data[p.group].append(p.val)
+
+	return data
+
+def plotCdf(data, title = "", xlabel = "", n_bins = 1000):
+	for group, vals in data.iteritems():
+		plt.hist(vals, n_bins, density = 1.0, histtype = 'step', cumulative = True, label = str(group))
+
+	plt.legend(loc = 'upper left')
+	plt.title(title)
+	plt.xlabel(xlabel)
+	plt.ylabel('CDF')
+
+	plt.show()
+
+def plotData(data, reduce_function = None, include_errbars = False, scatter_plot = False, title = None, xlabel = None, ylabel = None, print_xy_data = False):
 	handles = []
 	legend_labels = []
 	for group in data:
@@ -72,6 +126,10 @@ def plotData(data, reduce_function = None, include_errbars = False, scatter_plot
 			else:
 				xvs.append(xv)
 				yvs.append(yv)
+
+		if print_xy_data:
+			for x, y in zip(xvs, yvs):
+				print group, x, y
 
 		if scatter_plot:
 			h = plt.scatter(xvs, yvs, alpha = 0.25)
@@ -198,6 +256,12 @@ def dbDifference(v1, v2, unit_type):
 		v2 = 10.0 * math.log(v2, 10.0)
 	return abs(v1 - v2)
 
+def pathLossError(v1, v2, unit_type):
+	if unit_type == 'abs':
+		v1 = 10.0 * math.log(v1, 10.0)
+		v2 = 10.0 * math.log(v2, 10.0)
+	return v1 - v2
+
 def average(vals):
 	return sum(vals) / float(len(vals))
 
@@ -205,6 +269,7 @@ def allPoints(vals):
 	return vals
 
 x_labels = {('num_ss_selection',): 'Number of SS Selected',
+			('num_pu_selection',): 'Number of PU Selected',
 			('ss_receive_power_alpha',): 'Receive Power Alpha',
 			('ss_path_loss_alpha',): 'Path Loss Alpha',
 			('num_ss',): 'Total Number of SS',
@@ -224,7 +289,8 @@ y_labels = {'percent_diff_secure_vs_plain': 'Percent Difference between Secure a
 			'db_diff_plain_vs_ground': 'dB Difference between Plain and Ground',
 			'db_diff_secure_vs_ground': 'dB Difference between Secure and Ground',
 			'time_per_request': 'Time per SU Request (seconds)',
-			'preprocess_time': 'Pre-process time (seconds)'}
+			'preprocess_time': 'Pre-process time (seconds)',
+			'secure_write_time': 'Secure Write Time (seconds)'}
 
 def getYLabel(yv):
 	if yv in y_labels:
@@ -232,6 +298,17 @@ def getYLabel(yv):
 	else:
 		print 'Unrecognized yv:', yv
 		return str(yv)
+
+cdf_labels = {'path_loss_error': 'Path Loss Error (Plain - Ground)',
+				'abs_path_loss_error': 'Abs Path Loss Error'}
+
+def getCdfLabel(cdfv):
+	if cdfv in cdf_labels:
+		return cdf_labels[cdfv]
+	else:
+		print 'Unrecognized cdfv:', cdfv
+		return str(cdfv)
+
 
 rfuncs = {'average': average, 'min': min, 'max': max, 'median': median, 'all': allPoints}
 
@@ -248,14 +325,20 @@ if __name__ == '__main__':
 		parser.add_argument('-x_' + short_xv, '--use_' + full_xv + '_for_x_value', action = 'store_true', help = 'If given, uses ' + full_xv + ' for the x dimension.')
 
 	# Y values
-	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'),
+	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'), ('secure_write_time', 'swt'),
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
 				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db')]
 	for full_yv, short_yv in y_values:
 		parser.add_argument('-y_' + short_yv, '--use_' + full_yv + '_for_y_value', action = 'store_true', help = 'If given, uses ' + full_yv + ' for the y dimension.')
 
+	# CDF values. If given, then cannot give an x or y value.
+	cdf_values = [('path_loss_error', 'ple'), ('abs_path_loss_error', 'aple')]
+	for full_cdfv, short_cdfv in cdf_values:
+		parser.add_argument('-cdf_' + short_cdfv, '--use_' + full_cdfv + '_for_cdf_value', action = 'store_true', help = 'If given, uses ' + full_cdfv + ' to make a cdf plot.')
+
+
 	# Group values
-	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa')]
+	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa')]
 	for full_gv, short_gv in g_values:
 		parser.add_argument('-g_' + short_gv, '--use_' + full_gv + '_for_group_value', action = 'store_true', help = 'If given, uses ' + full_gv + ' for grouping data.')
 
@@ -268,6 +351,7 @@ if __name__ == '__main__':
 	parser.add_argument('-errbar', '--include_errbars', action = 'store_true', help = 'If given, includes error bars in the graph.')
 	parser.add_argument('-scatter', '--make_scatter_plot', action = 'store_true', help = 'If given, creates a scatter plot instead of line plot.')
 	parser.add_argument('-box_plot', '--make_box_plot', action = 'store_true', help = 'If given, creates a box plot instead of line plot.')
+	parser.add_argument('-print', '--print_xy_data', action = 'store_true', help = 'If given, prints ALL xy value. Doesn\'t work boxplot.')
 
 	parser.add_argument('-t', '--title', metavar = 'TITLE', type = str, nargs = 1, default = [''], help = 'Title of the plot')
 
@@ -304,7 +388,7 @@ if __name__ == '__main__':
 	for full_yv, _ in y_values:
 		if getattr(args, 'use_' + full_yv + '_for_y_value'):
 			if yv != None:
-				raise Exception('Cannot specify multiply y values')
+				raise Exception('Cannot specify multiple y values')
 			if full_yv in complex_y_values:
 				yv = complex_y_values[full_yv]
 				yfunc = complex_y_funcs[full_yv]
@@ -312,6 +396,31 @@ if __name__ == '__main__':
 				yv = (full_yv,)
 				yfunc = lambda y: y
 			this_y_value = full_yv
+
+	cdfv = None
+	cdffunc = None
+
+	complex_cdf_values = {'path_loss_error': (('path_loss', 'plain'), ('path_loss', 'ground'), 'unit_type'),
+							'abs_path_loss_error': (('path_loss', 'plain'), ('path_loss', 'ground'), 'unit_type')}
+	complex_cdf_funcs = {'path_loss_error': pathLossError,
+							'abs_path_loss_error': lambda x: abs(pathLossError(*x))}
+
+	this_cdf_value = None
+
+	for full_cdfv, _ in cdf_values:
+		if getattr(args, 'use_' + full_cdfv + '_for_cdf_value'):
+			if cdfv != None:
+				raise Exception('Cannot specify multiple cdf values')
+			if full_cdfv in complex_cdf_values:
+				cdfv = complex_cdf_values[full_cdfv]
+				cdffunc = complex_cdf_funcs[full_cdfv]
+			else:
+				cdfv = (full_cdfv,)
+				cdffunc = lambda x: x
+			this_cdf_value = full_cdfv
+
+	if cdfv != None and (xv != None or yv != None):
+		raise Exception('Cannot use both (x,y) and cdf')
 
 	gv = []
 	for full_gv, _ in g_values:
@@ -324,10 +433,14 @@ if __name__ == '__main__':
 		if vals != None and len(vals) > 0:
 			fv[full_fv] = map(tryConvert, vals)
 
-	data = groupValues(raw_values, xv, xfunc, yv, yfunc, gv, fv)
-
-	if args.make_box_plot:
-		makeBoxPlot(data, title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value))
+	if cdfv != None:
+		data = groupCdfValues(raw_values, cdfv, cdffunc, gv, fv)
+		plotCdf(data, title = args.title[0], xlabel = getCdfLabel(this_cdf_value))
 	else:
-		plotData(data, reduce_function = rfuncs[args.reduce_function[0]], include_errbars = args.include_errbars, scatter_plot = args.make_scatter_plot,
-				title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value))
+		data = groupValues(raw_values, xv, xfunc, yv, yfunc, gv, fv)
+
+		if args.make_box_plot:
+			makeBoxPlot(data, title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value))
+		else:
+			plotData(data, reduce_function = rfuncs[args.reduce_function[0]], include_errbars = args.include_errbars, scatter_plot = args.make_scatter_plot,
+					title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value), print_xy_data = args.print_xy_data)

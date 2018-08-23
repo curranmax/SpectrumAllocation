@@ -9,6 +9,8 @@
 const std::string Timer::secure_preprocessing = "secure_preprocessing";
 const std::string Timer::secure_su_request = "secure_su_request";
 
+const std::string Timer::secure_write = "secure_write";
+
 const std::string Timer::plaintext_split_preprocessing = "plaintext_split_preprocessing";
 const std::string Timer::plaintext_grid_preprocessing = "plaintext_grid_preprocessing";
 

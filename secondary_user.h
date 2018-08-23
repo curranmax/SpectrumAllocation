@@ -8,14 +8,17 @@
 // Will eventually need to have this support network updates from the SM
 class SecondaryUser {
 public:
-	SecondaryUser() : loc() {}
-	SecondaryUser(const Location& _loc) : loc(_loc) {}
-	SecondaryUser(const SecondaryUser& su) : loc(su.loc) {}
+	SecondaryUser() : index(0), loc() {}
+	SecondaryUser(int _index, const Location& _loc) : index(_index), loc(_loc) {}
+	SecondaryUser(const SecondaryUser& su) : index(su.index), loc(su.loc) {}
 
 	const SecondaryUser& operator=(const SecondaryUser& su) {
+		this->index = su.index;
 		this->loc = su.loc;
 		return *this;
 	}
+
+	int index;
 
 	Location loc;
 };

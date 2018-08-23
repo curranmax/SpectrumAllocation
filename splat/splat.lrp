@@ -5,6 +5,6 @@
 5	; Radio Climate
 0	; Polarization (0 = Horizontal, 1 = Vertical)
 0.50	; Fraction of Situations
-0.50	; Fraction of Time
+0.90	; Fraction of Time
 
 Please consult SPLAT! documentation for the meaning and use of this data.

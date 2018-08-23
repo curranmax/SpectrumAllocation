@@ -2,6 +2,7 @@
 #include "args.h"
 #include "generator.h"
 #include "location.h"
+#include "path_loss_table.h"
 #include "primary_user.h"
 #include "secondary_user.h"
 #include "spectrum_manager.h"
@@ -43,6 +44,9 @@ int main(int argc, char const *argv[]) {
 		pm = new LongleyRicePM(args.splat_cmd, args.ref_lat, args.ref_long,
 								args.splat_dir, args.sdf_dir, args.return_dir,
 								args.use_itwom_pl);
+	} else if(args.propagation_model == "single_lr") {
+		pm = new TransmitterOnlySplatPM(args.splat_cmd, args.ref_lat, args.ref_long,
+										args.splat_dir, args.sdf_dir, args.return_dir);
 	} else {
 		std::cerr << "Unknown propagation model: " << args.propagation_model << std::endl;
 		exit(0);
@@ -53,15 +57,29 @@ int main(int argc, char const *argv[]) {
 	std::vector<PU> pus;
 	std::vector<SS> sss;
 	std::vector<SU> sus;
-	gen.generateEntities(args.num_pu, args.num_ss, args.num_su, &pus, &sss, &sus);
+	gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus);
 	
 	float factor = 1 << args.num_float_bits;
 	SM sm(factor, args.num_ss_selection, args.num_pu_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
-	sm.setAlgoOrder(args.algo_order);
 	sm.setSelectionAlgo(args.selection_algo);
 
+	Timer secure_write_timer;
+	sm.setSecureWriteAlgo(args.secure_write_algo, &secure_write_timer);
+
 	if(args.grid_num_x > 0 && args.grid_num_y > 0) {
-		sm.setGridParams(args.num_ss_selection,
+		int k_pu = args.num_pu_selection;
+		int k_ss = args.num_ss_selection;
+
+		if(k_pu <= 0) {
+			k_pu = args.num_pu;
+		}
+
+		if(k_ss <= 0) {
+			k_ss = args.num_ss;
+		}
+
+		sm.setGridParams(
+				k_pu, k_ss,
 				args.grid_num_x, args.grid_num_y,
 				args.location_range / args.grid_num_x, args.location_range / args.grid_num_y);
 	}
@@ -69,8 +87,10 @@ int main(int argc, char const *argv[]) {
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
 	Timer t1;
-	if(!args.skip_s2pc) {	
+
+	if(!args.skip_s2pc) {
 		// "Split values"
+		// PU
 		std::vector<PUint> pus_int0;
 		std::vector<PUint> pus_int1;
 		for(unsigned int i = 0; i < pus.size(); ++i) {
@@ -79,6 +99,13 @@ int main(int argc, char const *argv[]) {
 			pus_int1.push_back(pu_split.second);
 		}
 
+		// Set all PUint's indexes
+		for(unsigned int i = 0; i < pus.size(); ++i) {
+			pus_int0[i].setInd(i);
+			pus_int1[i].setInd(i);
+		}
+
+		// SS
 		std::vector<SSint> sss_int0;
 		std::vector<SSint> sss_int1;
 		for(unsigned int i = 0; i < sss.size(); ++i) {
@@ -87,6 +114,7 @@ int main(int argc, char const *argv[]) {
 			sss_int1.push_back(ss_split.second);
 		}
 
+		// SU
 		std::vector<SUint> sus_int0;
 		std::vector<SUint> sus_int1;
 		for(unsigned int i = 0; i < sus.size(); ++i) {
@@ -98,45 +126,53 @@ int main(int argc, char const *argv[]) {
 		if(args.do_plaintext_split) {
 			t1.start(Timer::plaintext_split_preprocessing);
 
-			sm.plainTextRadarPreprocess(pus, sss, &sss_int0, &sss_int1);
+			sm.plainTextRadarPreprocess(pus_int0, pus_int1, &sss_int0, &sss_int1);
 
 			t1.end(Timer::plaintext_split_preprocessing);
 		}
 
+		std::map<int, std::vector<int> > precomputed_pu_int_groups;
 		std::map<int, std::vector<int> > precomputed_ss_int_groups;
 		if(sm.useGrid()) {
 			t1.start(Timer::plaintext_grid_preprocessing);
-			precomputed_ss_int_groups = sm.plainTextGrid(sss);
+			sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
 			t1.end(Timer::plaintext_grid_preprocessing);
 		}
 
 		NullTimer null_timer;
 
+		// Used for communication between the two SMs.
+		int num_io_threads = 2;
+		const std::string server_addr = "127.0.0.1:1212";
+		const std::string connection_name = "sm_connection";
+		const std::string channel_name = "sm-to-sm_channel";
+		sm.setCommunicationValues(num_io_threads, server_addr, connection_name, channel_name);
+
 		std::thread thrd0([&]() {
 			int party_id = 0; 
-			secure_vs_a = sm.run(party_id, pus_int0, sss_int0, sus_int0, precomputed_ss_int_groups, &t1);
+			secure_vs_a = sm.run(party_id, pus_int0, sss_int0, sus_int0, precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
 		});
 
 		std::thread thrd1([&]() {
 			int party_id = 1; 
-			secure_vs_b = sm.run(party_id, pus_int1, sss_int1, sus_int1, precomputed_ss_int_groups, &null_timer);
+			secure_vs_b = sm.run(party_id, pus_int1, sss_int1, sus_int1, precomputed_pu_int_groups, precomputed_ss_int_groups, &null_timer);
 		});
 
 		thrd0.join();
 		thrd1.join();
 	}
 
+	PathLossTable path_loss_table;
+
+	std::vector<float> plaintext_vs = sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table);
+	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table);
+	
 	std::vector<float> secure_vs;
-	std::vector<float> plaintext_vs = sm.plainTextRun(sus, pus, sss, &t1);
-	std::vector<float> ground_truth_vs;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		if(!args.skip_s2pc) {
 			float secure_v = secure_vs_a[i] + secure_vs_b[i];
 			secure_vs.push_back(secure_v);
 		}
-
-		float ground_truth_v = gen.computeGroundTruth(sus[i], pus);
-		ground_truth_vs.push_back(ground_truth_v);
 	}
 
 	if(args.brief_out) {
@@ -156,11 +192,29 @@ int main(int argc, char const *argv[]) {
 		}
 		std::cout << std::endl;
 
+		std::cout << "path_loss(plain,ground)|list(float,float)|";
+		unsigned int x = 0;
+		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
+			if(!itr->second.pt_set || !itr->second.gt_set) {
+				std::cerr << "Path loss not set" << std::endl;
+				exit(1);
+			}
+
+			std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
+			if(x < path_loss_table.table.size() - 1) {
+				std::cout << ",";
+			}
+			++x;
+		}
+		std::cout << std::endl;
+
 		if(!args.skip_s2pc) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "time_per_request|float|" << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
+			std::cout << "secure_write_time|float|" << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
 		}
 	} else {
+		std::cout << path_loss_table.table.size() << std::endl;
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
 			std::cout << "--------------------" << std::endl;
 			if(!args.skip_s2pc) {
@@ -182,6 +236,7 @@ int main(int argc, char const *argv[]) {
 		if(!args.skip_s2pc) {
 			std::cout << "Average duration of " << Timer::secure_preprocessing << ": " << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "Average duration of " << Timer::secure_su_request << ": " << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
+			std::cout << "Average duration of " << Timer::secure_write << ": " << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
 		}
 	}
 

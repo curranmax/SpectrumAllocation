@@ -12,12 +12,19 @@ TEST = 'test'
 
 VARY_NUM_SS_SELECT = 'vary_ss_select'
 
+WRITE_ALGO_TEST = 'write_algo_test'
+PATH_LOSS_TEST = 'path_loss_test'
+
 MED_TEST = 'med_test'
 LARGE_TEST = 'large_test'
 
+OUTPUT_RUN = 'output'
+
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
-						MED_TEST, LARGE_TEST]
+						WRITE_ALGO_TEST, PATH_LOSS_TEST,
+						MED_TEST, LARGE_TEST,
+						OUTPUT_RUN]
 
 # Change parameters
 NUM_SS_SELECTION = 'num_ss_selection'
@@ -32,6 +39,9 @@ def makeDefaultExperimentParam():
 	param.num_pu = 5
 	param.num_su = 10
 	param.num_ss = 100
+
+	param.num_pr_per_pu = 1
+	param.pr_range = 0.0
 
 	param.location_range = 100
 
@@ -55,10 +65,10 @@ def makeDefaultExperimentParam():
 	param.num_ss_selection = 0
 	param.num_pu_selection = 0
 
-	param.do_plaintext_split = False
+	param.do_plaintext_split = True
 
-	param.algo_order = 'split_then_idw'
 	param.selection_algo = 'sort'
+	param.secure_write_algo = 'proposed'
 
 	param.grid_x = 0
 	param.grid_y = 0
@@ -80,7 +90,12 @@ class ExperimentParam:
 		self.num_su = None
 		self.num_ss = None
 
+		self.num_pr_per_pu = None
+		self.pr_range = None
+
 		self.location_range = None
+
+		self.out_filename = None
 
 		self.unit_type = None
 
@@ -104,9 +119,8 @@ class ExperimentParam:
 
 		self.do_plaintext_split = None
 
-		self.algo_order = None
 		self.selection_algo = None
-		self.path_loss_type = None
+		self.secure_write_algo = None
 
 		self.grid_x = None
 		self.grid_y = None
@@ -136,12 +150,12 @@ def makeExperimentResult(vals):
 
 class ExperimentResult:
 	def __init__(self):
-		self.ground_truth_path_loss = None
-		self.su_to_pu_dist = None
 		self.preprocess_time = None
 		self.su_transmit_power = None
 		self.rand_seed = None
 		self.time_per_request = None
+		self.secure_write_time = None
+		self.path_loss = None
 
 	def getCols(self):
 		# each value is a 3 tuple (var_name, var_name_for_output, val_type)
@@ -271,18 +285,20 @@ def readInParamResult(filenames):
 def runExperiment(param, no_run = False):
 	args = ['../s2pc', '-brief_out']
 
-	var_flag_names = {'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
-						'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
-						'unit_type': 'ut', 'propagation_model': 'pm',
-						'ld_path_loss0': 'ld_pl0', 'ld_dist0': 'ld_d0', 'ld_gamma': 'ld_g',
-						'splat_cmd': 'splat_cmd', 'ref_lat': 'ref_lat', 'ref_long': 'ref_long',
-						'splat_dir': 'splat_dir', 'sdf_dir': 'sdf_dir', 'return_dir': 'return_dir',
-						'num_ss_selection': 'nss_s', 'num_pu_selection': 'npu_s',
-						'do_plaintext_split': 'do_pt_split',
-						'algo_order': 'ao', 'selection_algo': 'sel_algo', 'path_loss_type': 'plt',
-						'grid_x': 'grid_x', 'grid_y': 'grid_y',
-						'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
-						'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count'}
+	var_flag_names = {
+			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
+			'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
+			'num_pr_per_pu': 'npr', 'pr_range': 'prr', 'out_filename': 'out',
+			'unit_type': 'ut', 'propagation_model': 'pm',
+			'ld_path_loss0': 'ld_pl0', 'ld_dist0': 'ld_d0', 'ld_gamma': 'ld_g',
+			'splat_cmd': 'splat_cmd', 'ref_lat': 'ref_lat', 'ref_long': 'ref_long',
+			'splat_dir': 'splat_dir', 'sdf_dir': 'sdf_dir', 'return_dir': 'return_dir',
+			'num_ss_selection': 'nss_s', 'num_pu_selection': 'npu_s',
+			'do_plaintext_split': 'do_pt_split',
+			'selection_algo': 'sel_algo', 'secure_write_algo': 'sec_write_algo',
+			'grid_x': 'grid_x', 'grid_y': 'grid_y',
+			'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
+			'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count'}
 
 	# Check that all attrs have flags
 	vs = []
@@ -452,15 +468,28 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], ('grid_x', 'grid_y', 'selection_algo'): [(500, 500, 'none')],
-							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [10], 'ld_gamma': [0.25],
-							'num_pu': [25], PL_ALPHA: [2], RP_ALPHA: [2],
-							'location_range': [500.0], 'num_ss': [2500], 'num_su': [100], 'unit_type': ['db']})
+			changes.append({NUM_SS_SELECTION: [10], 'num_pu_selection': [2], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
+							'propagation_model': ['single_lr'], #'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
+							'location_range': [100.0], 'num_ss': [100], 'num_su': [1], 'unit_type': ['db'],
+							'num_pr_per_pu': [5], 'pr_range': [20]})
 		if experiment == VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
+		if experiment == WRITE_ALGO_TEST:
+			changes.append({NUM_SS_SELECTION: [1], 'num_pu_selection': [1, 10, 25, 50], ('grid_x', 'grid_y'): [(1000, 1000)],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+							'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
+							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+							'secure_write_algo':['proposed', 'spc']})
+		if experiment == PATH_LOSS_TEST:
+			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+							'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
+							PL_ALPHA: [1, 2], RP_ALPHA: [1, 2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db', 'abs'],
+							'skip_s2pc': [True]})
 		if experiment == MED_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], 'num_pu_selection': [1, 5, 10],
 							('num_pu', 'num_ss', 'location_range', 'grid_x', 'grid_y'):
@@ -472,10 +501,15 @@ if __name__ == '__main__':
 							'propagation_model': ['longley_rice'],
 							PL_ALPHA: [2], RP_ALPHA: [2], 'unit_type': ['db']})
 		if experiment == LARGE_TEST:
-			changes.append({NUM_SS_SELECTION: [25], 'num_pu_selection': [1, 50, 100, 200, 300, 400], ('grid_x', 'grid_y'): [(100, 100)],
-							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [10], 'ld_gamma': [0.25],
-							'num_pu': [1, 25, 50, 100, 200, 300, 400], 'num_ss': [4000], 'num_su': [10],
-							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'], 'do_plaintext_split': [True]})
+			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [1, 10, 25,  50], ('grid_x', 'grid_y'): [(1000, 1000)],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+							'num_pu': [400], 'num_ss': [4000], 'num_su': [10],
+							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db']})
+		if experiment == OUTPUT_RUN:
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000],
+							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+							'propagation_model': ['single_lr'],
+							'out_filename': ['gen_out/data1.txt']})
 
 	num_experiments = sum(reduce(mul, [len(vals) for _, vals in change.iteritems()]) for change in changes) * args.num_tests[0]
 

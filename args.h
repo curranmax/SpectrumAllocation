@@ -46,8 +46,13 @@ class Args {
 	int num_ss;
 	int num_su;
 	float location_range; // in Meters
+
+	int num_pr_per_pu;
+	float pr_range;
 	
 	std::string unit_type; // Either "abs" or "db".
+
+	std::string out_filename;
 
 	// Propagation Model
 	std::string propagation_model;
@@ -75,8 +80,8 @@ class Args {
 
 	bool do_plaintext_split;
 	
-	std::string algo_order;
 	std::string selection_algo;
+	std::string secure_write_algo;
 
 	// Grid params
 	int grid_num_x, grid_num_y;

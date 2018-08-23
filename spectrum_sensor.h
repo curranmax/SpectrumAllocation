@@ -4,6 +4,8 @@
 
 #include "location.h"
 
+#include <vector>
+
 class SpectrumSensor {
 public:
 	SpectrumSensor() : loc(), received_power(0.0) {}
