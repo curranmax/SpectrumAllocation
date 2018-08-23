@@ -1,5 +1,5 @@
 
-SA_PATH = ../
+SA_PATH = ..
 
 INC_PATH = -I $(SA_PATH)/Ivory-Runtime -I $(SA_PATH)/libOTe -I $(SA_PATH)/libOTe/cryptoTools -I $(SA_PATH)/libOTe/cryptoTools/thirdparty/linux/ -I $(SA_PATH)/itm/c/
 
