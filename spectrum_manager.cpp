@@ -598,12 +598,14 @@ float SpectrumManager::secureRadar(
 		const std::vector<PUint>& pus, const std::vector<SSint>& sss,
 		PUTable* pu_table, Channel* sm_ch) const {
 	// Constants
-	sInt zero = INPUT(parties, 0, 0, bit_count);
-	sInt one  = INPUT(parties, 0, 1, bit_count);
-	sInt two  = INPUT(parties, 0, 2, bit_count);
+	sInt zero = INPUT(parties, 0,  0, bit_count);
+	sInt one  = INPUT(parties, 0,  1, bit_count);
+	sInt two  = INPUT(parties, 0,  2, bit_count);
+	sInt ten  = INPUT(parties, 0, 10, bit_count);
 
 	sInt factor_int = INPUT(parties, 0, int(factor), bit_count);
 	sInt large = INPUT(parties, 0, factor * factor * 10, bit_count); // TODO
+	sInt ln_ten = INPUT(parties, 0, int(LN_TEN * factor), bit_count);
 
 	// |------------------|
 	// |  Combine values  |
@@ -968,9 +970,11 @@ float SpectrumManager::secureRadar(
 	// TODO Send these values to the SU, and get the actual transmit power
 	int actual_su_tp_pt = 0;
 
-	sInt actual_su_tp_a = INPUT(parties, 0, actual_su_tp_pt, bit_count);
-	sInt actual_su_tp_b = INPUT(parties, 1, actual_su_tp_pt, bit_count);
+	sInt actual_su_tp_a = INPUT(parties, 0, int(actual_su_tp_pt * factor), bit_count);
+	sInt actual_su_tp_b = INPUT(parties, 1, int(actual_su_tp_pt * factor), bit_count);
 	sInt actual_su_tp = actual_su_tp_a + actual_su_tp_b;
+
+	sInt tmp_diff = INPUT(parties, 0, int(-5.0 * factor), bit_count);
 
 	// Calculate updates
 	// updates[i].first is the index of the PU to update, and updates[i].second is the list of updates to the PR threshholds to update.
@@ -981,8 +985,23 @@ float SpectrumManager::secureRadar(
 
 		int num_prs = 1;
 		for(int x = 0; x < num_prs; ++x) {
-			// TODO calculate PR threshold update
-			updates[y].second.push_back(zero - one);
+			// Calculate the update to the PR thresh: u = 10 * log_10(1.0 - 10 ^ ((rp - thresh) / 10))
+			sInt diff_dbm = tmp_diff + zero;
+			sInt diff_div_ten = diff_dbm / ten;
+
+			sInt ten_to_diff;
+			utils::securePow10(&ten_to_diff, diff_div_ten, parties, bit_count, factor, factor_int);
+
+			ten_to_diff = factor_int - ten_to_diff;
+
+			sInt log_diff;
+			utils::secureLog10(&log_diff, ten_to_diff, zero, factor_int, ln_ten, LOG_CALC_ITERS);
+
+			sInt update = ten * log_diff;
+
+			// TODO If diff is beyond some constant, make update zero
+
+			updates[y].second.push_back(update);
 		}
 	}
 	secureTableWrite(parties, pu_table, updates, sm_ch);

@@ -2,6 +2,7 @@
 #ifndef _CUSTOM_IVORY_UTILS_H_
 #define _CUSTOM_IVORY_UTILS_H_
 
+#include "ivory/Runtime/Party.h"
 #include "ivory/Runtime/sInt.h"
 
 using namespace osuCrypto;
@@ -34,6 +35,11 @@ void secureLog10(
 	sInt* ans, const sInt& v,
 	const sInt& zero, const sInt& factor_int, const sInt& ln_10,
 	int num_iters);
+
+void securePow10(
+		sInt* ans, const sInt& v,
+		std::array<Party, 2>& parties, int bit_count,
+		float factor, const sInt& factor_int);
 
 float todBm(float rp_in_mW);
 float fromdBm(float rp_in_dBm);

@@ -1,6 +1,7 @@
 
 #include "utils.h"
 
+#include "ivory/Runtime/Party.h"
 #include "ivory/Runtime/sInt.h"
 
 #include <math.h>
@@ -8,6 +9,11 @@
 #include <stdlib.h>
 
 using namespace osuCrypto;
+
+#define INPUT(parties, party_id, val, bit_count) parties[party_id].isLocalParty() ? parties[party_id].input<sInt>(val, bit_count) : parties[party_id].input<sInt>(bit_count)
+
+#define POW_RAND_MIN -1.0
+#define POW_RAND_MAX -1.0
 
 utils::UnitType utils::unit_type = utils::UnitType::ABS;
 
@@ -68,6 +74,41 @@ void utils::secureLog10(
 	}
 
 	*ans = factor_int * (*ans) / ln_10;
+}
+
+void utils::securePow10(
+		sInt* ans, const sInt& v,
+		std::array<Party, 2>& parties, int bit_count,
+		float factor, const sInt& factor_int) {
+	// Party 0 generates a random value rv
+	float rv = randomFloat(POW_RAND_MIN, POW_RAND_MAX);
+	sInt rv_secure = INPUT(parties, 0, int(rv * factor), bit_count);
+
+	// Party 1 gets v + rv
+	sInt v_plus_rv_secure = v + rv_secure;
+
+	parties[1].reveal(v_plus_rv_secure);
+	float v_plus_rv = 0.0;
+	if(parties[1].isLocalParty()) {
+		v_plus_rv = float(v_plus_rv_secure.getValue()) / float(factor);
+	}
+	parties[0].getRuntime().processesQueue();
+
+	// Party 0 calculates 10^rv, and Party 1 calculates 1o^(v + rv)
+	float ten_to_rv = 0.0;
+	float ten_to_v_plus_rv = 0.0;
+	if(parties[0].isLocalParty()) {
+		ten_to_rv = pow(10.0, rv);
+	}
+	if(parties[1].isLocalParty()) {
+		ten_to_v_plus_rv = pow(10.0, v_plus_rv);
+	}
+
+	// Input values to S2-PC and calculate desired result
+	sInt ten_to_rv_secure = INPUT(parties, 0, ten_to_rv, bit_count);
+	sInt ten_to_v_plus_rv_secure = INPUT(parties, 1, ten_to_v_plus_rv, bit_count);
+
+	*ans = factor_int * ten_to_rv_secure / ten_to_v_plus_rv_secure;
 }
 
 float utils::todBm(float rp_in_mW) {
