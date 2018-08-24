@@ -20,14 +20,14 @@
 // Earth's radius in meters
 #define EARTH_RADIUS 6378000.0
 
+const float ss_height = 10.0;
+const float su_height = 10.0;
+const float pu_height = 50.0;
+
 void Generator::generateEntities(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string & out_filename,
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const {
-	const float ss_height = 10.0;
-	const float su_height = 10.0;
-	const float pu_height = 50.0;
 	const float pr_height = (num_pr_per_pu == 1 ? pu_height : ss_height);
-
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
 		float x = utils::randomFloat(0.0, location_range);
@@ -59,7 +59,6 @@ void Generator::generateEntities(
 		// PRs
 		PU pu(Location(pu_x, pu_y, pu_height), transmit_power);
 		for(int x = 0; x < num_pr_per_pu; ++x) {
-			std::cout << j << " " << x << std::endl;
 			Location pr_loc;
 			if(num_pr_per_pu > 1) {
 				float pr_x = utils::randomFloat(-pr_range, pr_range) + pu.loc.x;
@@ -90,20 +89,23 @@ void Generator::generateEntities(
 
 			PR pr(pr_loc, threshold);
 
-			pm->preprocessPathLoss(&pr, su_height, j, x);
-
 			pu.prs.push_back(pr);
 		}
 
-
 		// Run single and get data
-		pm->preprocessPathLoss(&pu, ss_height, j);
+		if(out_filename == "") {
+			pm->preprocessPathLoss(&pu, ss_height, j);
+			pm->loadANOFile(pu);
+		}
 		
 		(*pus).push_back(pu);
 
 		// Loop over SS and get the path loss between the PU and SS
 		for(int i = 0; i < num_ss; ++i) {
-			float path_loss = pm->getPathLoss((*pus)[j].loc, (*sss)[i].loc);
+			float path_loss = 1.0;
+			if(out_filename == "") {
+				path_loss = pm->getPathLoss((*pus)[j].loc, (*sss)[i].loc);
+			}
 			if(utils::unit_type == utils::UnitType::ABS) {
 				(*sss)[i].received_power += path_loss * (*pus)[j].transmit_power;
 			} else if(utils::unit_type == utils::UnitType::DB) {
@@ -135,7 +137,7 @@ void Generator::generateEntities(
 	}
 }
 
-void Generator::outputEntities(const std::string& out_filename, const std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const {
+void Generator::outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const {
 	std::ofstream out(out_filename);
 
 	// Write out Locations
@@ -160,19 +162,25 @@ void Generator::outputEntities(const std::string& out_filename, const std::vecto
 	// Path losses
 	// PU -> SS
 	for(unsigned int j = 0; j < pus.size(); ++j) {
+		pm->preprocessPathLoss(&(pus[j]), ss_height, j);
 		pm->loadANOFile(pus[j]);
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			out << "PU_PL " << j << " " << i << " " << pm->getPathLoss(pus[j].loc, sss[i].loc) << std::endl;
 		}
+		// Delete file
+		utils::deleteFile(pus[j].splat_ano_filename);
 	}
 
 	// PR -> SU
 	for(unsigned int j = 0; j < pus.size(); ++j) {
 		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+			pm->preprocessPathLoss(&(pus[j].prs[x]), su_height, j, x);
 			pm->loadANOFile(pus[j].prs[x]);
 			for(unsigned int i = 0; i < sus.size(); ++i) {
 				out << "PR_PL " << j << " " << x << " " << i << " " << pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc) << std::endl;
 			}
+			// Delete PR file
+			utils::deleteFile(pus[j].prs[x].splat_ano_filename);
 		}
 	}
 	out.close();
@@ -360,7 +368,7 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PU* pu, float ss_height, int pu_
 	}
 	chdir(return_dir.c_str());
 	
-	loadANOFile(*pu);
+	// loadANOFile(*pu);
 }
 
 void TransmitterOnlySplatPM::loadANOFile(const PU& pu) {

@@ -472,7 +472,8 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'], #'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
 							'location_range': [100.0], 'num_ss': [100], 'num_su': [1], 'unit_type': ['db'],
-							'num_pr_per_pu': [5], 'pr_range': [20]})
+							'num_pr_per_pu': [5], 'pr_range': [20],
+							'out_filename': ['../gen_out/data1.txt']})
 		if experiment == VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
 							'propagation_model': ['longley_rice'],

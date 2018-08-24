@@ -39,7 +39,7 @@ public:
 	void generateEntities(int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string& out_filename,
 						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const;
 
-	void outputEntities(const std::string& out_filename, const std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const;
+	void outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const;
 
 	std::vector<float> computeGroundTruth(const std::vector<SU>& su, const std::vector<PU>& pus, PathLossTable* path_loss_table) const;
 

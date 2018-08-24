@@ -1001,7 +1001,7 @@ float SpectrumManager::secureRadar(
 
 			// TODO If diff is beyond some constant, make update zero
 
-			updates[y].second.push_back(update);
+			updates[y].second.push_back(update + zero);
 		}
 	}
 	secureTableWrite(parties, pu_table, updates, sm_ch);

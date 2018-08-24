@@ -46,6 +46,8 @@ float fromdBm(float rp_in_dBm);
 
 float randomFloat(float min, float max);
 
+bool deleteFile(const std::string& filename);
+
 }
 
 #endif

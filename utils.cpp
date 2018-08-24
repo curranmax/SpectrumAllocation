@@ -122,3 +122,7 @@ float utils::fromdBm(float rp_in_dBm) {
 float utils::randomFloat(float min, float max) {
 	return ((float) rand()) / ((float) RAND_MAX) * (max - min) + min;
 }
+
+bool utils::deleteFile(const std::string& filename) {
+	return remove(filename.c_str()) == 0;
+}
