@@ -520,6 +520,9 @@ if __name__ == '__main__':
 
 	num_experiments = sum(reduce(mul, [len(vals) for _, vals in change.iteritems()]) for change in changes) * args.num_tests[0]
 
+	if num_experiments <= 0:
+		raise Exception('No tests specified')
+
 	out_values = []
 	exp_num = 1
 	durs = []
