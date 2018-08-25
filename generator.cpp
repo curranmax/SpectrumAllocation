@@ -155,7 +155,7 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 	// Write out Locations
 	// PU + PRs
 	for(unsigned int j = 0; j < pus.size(); ++j) {
-		std::cout << "Outputting PU " << j + 1 << " of " << pus.size() << std::endl;
+		// std::cout << "Outputting PU " << j + 1 << " of " << pus.size() << std::endl;
 		out << "PU " << j << " " << pus[j].loc.x << " " << pus[j].loc.y << " " << pus[j].loc.z << " " << pus[j].transmit_power << std::endl;
 		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
 			out << "PR " << j << " " << x << " " << pus[j].prs[x].loc.x << " " << pus[j].prs[x].loc.y << " " << pus[j].prs[x].loc.z << " " << pus[j].prs[x].threshold << std::endl;
@@ -164,25 +164,25 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 
 	// SS
 	for(unsigned int i = 0; i < sss.size(); ++i) {
-		std::cout << "Outputting SS " << i + 1 << " of " << sss.size() << std::endl;
+		// std::cout << "Outputting SS " << i + 1 << " of " << sss.size() << std::endl;
 		out << "SS " << i << " " << sss[i].loc.x << " " << sss[i].loc.y << " " << sss[i].loc.z << std::endl;
 	}
 
 	// SU
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		std::cout << "Outputting SU " << i + 1 << " of " << sus.size() << std::endl;
+		// std::cout << "Outputting SU " << i + 1 << " of " << sus.size() << std::endl;
 		out << "SU " << i << " " << sus[i].loc.x << " " << sus[i].loc.y << " " << sus[i].loc.z << std::endl;
 	}
 
 	// Path losses
 	// PU -> SS
 	for(unsigned int j = 0; j < pus.size(); ++j) {
-		std::cout << "Outputting PU_PL " << j + 1 << " of " << pus.size() << std::endl;
+		// std::cout << "Outputting PU_PL " << j + 1 << " of " << pus.size() << std::endl;
 		pm->preprocessPathLoss(&(pus[j]), ss_height, j);
 		pm->loadANOFile(pus[j]);
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			float path_loss = pm->getPathLoss(pus[j].loc, sss[i].loc);
-			std::cout << path_loss << std::endl;
+			// std::cout << path_loss << std::endl;
 			out << "PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
 		// Delete file
@@ -198,13 +198,13 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 	int this_pr_pl = 1;
 	for(unsigned int j = 0; j < pus.size(); ++j) {
 		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
-			std::cout << "Outputting PR_PL " << this_pr_pl << " of " << num_pr_pl << std::endl;
+			// std::cout << "Outputting PR_PL " << this_pr_pl << " of " << num_pr_pl << std::endl;
 			pm->preprocessPathLoss(&(pus[j].prs[x]), su_height, j, x);
 			pm->loadANOFile(pus[j].prs[x]);
 			for(unsigned int i = 0; i < sus.size(); ++i) {
 				float path_loss = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
-				std::cout << path_loss << std::endl;
-				out << "PR_PL " << j << " " << x << " " << i << " " << pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc) << std::endl;
+				// std::cout << path_loss << std::endl;
+				out << "PR_PL " << j << " " << x << " " << i << " " << path_loss << std::endl;
 			}
 			// Delete PR file
 			utils::deleteFile(pus[j].prs[x].splat_ano_filename);
