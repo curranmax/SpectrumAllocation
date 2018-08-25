@@ -181,7 +181,9 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		pm->preprocessPathLoss(&(pus[j]), ss_height, j);
 		pm->loadANOFile(pus[j]);
 		for(unsigned int i = 0; i < sss.size(); ++i) {
-			out << "PU_PL " << j << " " << i << " " << pm->getPathLoss(pus[j].loc, sss[i].loc) << std::endl;
+			float path_loss = pm->getPathLoss(pus[j].loc, sss[i].loc);
+			std::cout << path_loss << std::endl;
+			out << "PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);
@@ -200,6 +202,8 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			pm->preprocessPathLoss(&(pus[j].prs[x]), su_height, j, x);
 			pm->loadANOFile(pus[j].prs[x]);
 			for(unsigned int i = 0; i < sus.size(); ++i) {
+				float path_loss = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
+				std::cout << path_loss << std::endl;
 				out << "PR_PL " << j << " " << x << " " << i << " " << pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc) << std::endl;
 			}
 			// Delete PR file
@@ -377,7 +381,7 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PU* pu, float ss_height, int pu_
 	std::stringstream sstr;
 	float timeout_seconds = 30;
 	sstr << "timeout " << timeout_seconds << "s " << splat_cmd << " -t " << pu_fname << " -d " << sdf_dir << " -L " << ss_height <<
-			" -metric -R 20 -ano " << pu->splat_ano_filename << " > /dev/null 2>&1";
+			" -metric -R 20 -ano " << "ano_files/pu_" << pu_id << ".ano" << " > /dev/null 2>&1";
 
 	int sys_code = 1;
 	int num_tries = 2;
@@ -391,8 +395,6 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PU* pu, float ss_height, int pu_
 		exit(1);
 	}
 	chdir(return_dir.c_str());
-	
-	// loadANOFile(*pu);
 }
 
 void TransmitterOnlySplatPM::loadANOFile(const PU& pu) {
@@ -450,6 +452,8 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PR* pr, float su_height, int pu_
 		std::stringstream sstr;
 		sstr << splat_dir << "ano_files/pr_" << pu_id << "_" << pr_id << ".ano";
 		pr->splat_ano_filename = sstr.str();
+
+		std::cout << pr->splat_ano_filename << std::endl;
 	}
 
 	// Convert location to longitude and lattitude
@@ -465,7 +469,7 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PR* pr, float su_height, int pu_
 	std::stringstream sstr;
 	float timeout_seconds = 30;
 	sstr << "timeout " << timeout_seconds << "s " << splat_cmd << " -t " << pr_fname << " -d " << sdf_dir << " -L " << su_height <<
-			" -metric -R 20 -ano " << pr->splat_ano_filename << " > /dev/null 2>&1";
+			" -metric -R 20 -ano " << "ano_files/pr_" << pu_id << "_" << pr_id << ".ano" << " > /dev/null 2>&1";
 
 	int sys_code = 1;
 	int num_tries = 2;
@@ -479,8 +483,6 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PR* pr, float su_height, int pu_
 		exit(1);
 	}
 	chdir(return_dir.c_str());
-	
-	// loadANOFile(*pr);
 }
 
 void TransmitterOnlySplatPM::loadANOFile(const PR& pr) {
