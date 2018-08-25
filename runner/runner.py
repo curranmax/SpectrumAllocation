@@ -18,13 +18,14 @@ PATH_LOSS_TEST = 'path_loss_test'
 MED_TEST = 'med_test'
 LARGE_TEST = 'large_test'
 
+TEST_OUTPUT= 'test_output'
 OUTPUT_RUN = 'output'
 
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
 						WRITE_ALGO_TEST, PATH_LOSS_TEST,
 						MED_TEST, LARGE_TEST,
-						OUTPUT_RUN]
+						TEST_OUTPUT, OUTPUT_RUN]
 
 # Change parameters
 NUM_SS_SELECTION = 'num_ss_selection'
@@ -506,8 +507,13 @@ if __name__ == '__main__':
 							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 							'num_pu': [400], 'num_ss': [4000], 'num_su': [10],
 							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db']})
+		if experiment == TEST_OUTPUT:
+			changes.append({'num_pu': [10], 'num_ss': [100], 'num_su': [10], 'num_pr_per_pu' : [2], 'pr_range': [10.0],
+							'location_range': [100.0], 'unit_type': ['db'],
+							'propagation_model': ['single_lr'],
+							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000],
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [10], 'pr_range': [100.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/data1.txt']})
