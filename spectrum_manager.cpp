@@ -29,33 +29,18 @@ using namespace osuCrypto;
 #define LN_TEN 2.30258509299404568401
 #define LOG_CALC_ITERS 10
 
-void SpectrumManager::setGridParams(int _grid_min_num_pu, int _grid_min_num_ss, int _grid_num_x, int _grid_num_y, float _grid_delta_x, float _grid_delta_y) {
-	use_grid = true;
-	grid_min_num_pu = _grid_min_num_pu;
-	grid_min_num_ss = _grid_min_num_ss;
-	grid_num_x = _grid_num_x;
-	grid_num_y = _grid_num_y;
-	grid_delta_x = _grid_delta_x;
-	grid_delta_y = _grid_delta_y;
-
-	initGroupDeviations();
-}
-
-void SpectrumManager::setCommunicationValues(int _num_io_threads, const std::string& _server_addr, const std::string& _connection_name, const std::string& _channel_name) {
-	num_io_threads = _num_io_threads;
-	server_addr = _server_addr;
-	connection_name = _connection_name;
-	channel_name = _channel_name;
+unsigned int numSelect(int input_val, unsigned int size) {
+	if(input_val <= 0 || (unsigned int)input_val > size) {
+		return size;
+	}
+	return input_val;
 }
 
 // Options: order(split rp at ss then estimate pl at su, estimate rp at su then split rp and calc pl), pl type(ratio, db)
-std::vector<float> SpectrumManager::run(int party_id,
-										const std::vector<PUint>& pus,
-										std::vector<SSint>& sss,
-										const std::vector<SUint>& sus,
-										const std::map<int, std::vector<int> >& precomputed_pu_groups,
-										const std::map<int, std::vector<int> >& precomputed_ss_groups,
-										Timer* timer) const {
+std::vector<float> SpectrumManager::run(
+		const std::map<int, std::vector<int> >& precomputed_pu_groups,
+		const std::map<int, std::vector<int> >& precomputed_ss_groups,
+		Timer* timer) {
 	std::string address = "127.0.0.1:9000";
 
 	auto session_mode = SessionMode::Client;
@@ -94,13 +79,18 @@ std::vector<float> SpectrumManager::run(int party_id,
 	};
 
 	// Establsih channel between SMs
-	IOService com_ios(num_io_threads);
-	Endpoint ep(com_ios, server_addr, (parties[0].isLocalParty() ? EpMode::Server : EpMode::Client), connection_name);
-	Channel sm_ch = ep.addChannel(channel_name);
+	IOService com_ios(sm_params->num_io_threads);
+	Endpoint ep(com_ios, sm_params->server_addr, (parties[0].isLocalParty() ? EpMode::Server : EpMode::Client), sm_params->connection_name);
+	Channel sm_ch = ep.addChannel(sm_params->channel_name);
 	sm_ch.waitForConnection();
 
+	// Establsih channel between the SM and SU server
+	Endpoint ep_su(com_ios, (parties[0].isLocalParty() ? "127.0.0.1:1213" : "127.0.0.1:1214"), EpMode::Client, (parties[0].isLocalParty() ? "sm0-su" : "sm1-su"));
+	Channel su_ch = ep_su.addChannel((parties[0].isLocalParty() ? "sm0-su-channel" : "sm1-su-channel"));
+	su_ch.waitForConnection();
+
 	// Run the preprocessing calculations:
-	if(parties[0].isLocalParty() && !brief_out) {
+	if(parties[0].isLocalParty() && !(sm_params->brief_out)) {
 		std::cout << "Starting preprocessing" << std::endl;
 	}
 	timer->start(Timer::secure_preprocessing);
@@ -111,12 +101,12 @@ std::vector<float> SpectrumManager::run(int party_id,
 
 	bool first = true;
 	unsigned int ss_rp_size = 0;
-	for(unsigned int i = 0; i < sss.size(); ++i) {
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
 		if(first) {
 			first = false;
-			ss_rp_size = sss[i].received_power_from_pu.size();
+			ss_rp_size = all_sss[i].received_power_from_pu.size();
 		} else {
-			if(ss_rp_size != sss[i].received_power_from_pu.size()) {
+			if(ss_rp_size != all_sss[i].received_power_from_pu.size()) {
 				std::cerr << "Not all SSint have the same size 'received_power_from_pu'" << std::endl;
 				exit(1);
 			}
@@ -124,9 +114,9 @@ std::vector<float> SpectrumManager::run(int party_id,
 	}
 
 	if(ss_rp_size == 0) {
-		secureRadarPreprocess(parties, pus, &sss);
-	} else if(ss_rp_size != pus.size()) {
-		std::cerr << "Invalid ss_rp_size: " << ss_rp_size << std::endl << "Wanted either 0 or pus.size (" << pus.size() << ")" << std::endl;
+		secureRadarPreprocess(parties);
+	} else if(ss_rp_size != all_pus.size()) {
+		std::cerr << "Invalid ss_rp_size: " << ss_rp_size << std::endl << "Wanted either 0 or pus.size (" << all_pus.size() << ")" << std::endl;
 		exit(1);
 	}
 
@@ -136,95 +126,327 @@ std::vector<float> SpectrumManager::run(int party_id,
 
 	GridTable grid_table;
 	PUTable pu_table;
-	if(use_grid) {
+	if(sm_params->use_grid) {
 		if(precomputed_ss_groups.size() > 0) {
 			for(auto itr = precomputed_ss_groups.begin(); itr != precomputed_ss_groups.end(); ++itr) {
 				for(unsigned int i = 0; i < itr->second.size(); ++i) {
-					ss_groups[itr->first].push_back(&sss[itr->second[i]]);
+					ss_groups[itr->first].push_back(&all_sss[itr->second[i]]);
 				}
 			}
 		} else {
-			ss_groups = secureSSGridPreprocess(parties, sss);
+			ss_groups = secureSSGridPreprocess(parties);
 		}
 
 		if(precomputed_pu_groups.size() > 0) {
 			for(auto itr = precomputed_pu_groups.begin(); itr != precomputed_pu_groups.end(); ++itr) {
 				for(unsigned int i = 0; i < itr->second.size(); ++i) {
-					pu_groups[itr->first].push_back(&pus[itr->second[i]]);
+					pu_groups[itr->first].push_back(&all_pus[itr->second[i]]);
 				}
 			}
 		} else {
-			pu_groups = securePUGridPreprocess(parties, pus);
+			pu_groups = securePUGridPreprocess(parties);
 		}
 
 		buildTables(ss_groups, pu_groups, &grid_table, &pu_table);
 	}
 
 	timer->end(Timer::secure_preprocessing);
-	if(parties[0].isLocalParty() && !brief_out) {
+	if(parties[0].isLocalParty() && !sm_params->brief_out) {
 		std::cout << "Finished preprocessing" << std::endl;
 	}
 
 	std::vector<float> su_rps;
 	std::vector<PUint> selected_pus;
 	std::vector<SSint> selected_sss;
-	if(!use_grid) {
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			selected_pus.push_back(pus[j]);
+	if(!sm_params->use_grid) {
+		for(unsigned int j = 0; j < all_pus.size(); ++j) {
+			selected_pus.push_back(all_pus[j]);
 		}
-		for(unsigned int i = 0; i < sss.size(); ++i) {
-			selected_sss.push_back(sss[i]);
+		for(unsigned int i = 0; i < all_sss.size(); ++i) {
+			selected_sss.push_back(all_sss[i]);
 		}
 	}
-	for(unsigned int i = 0; i < sus.size(); ++i) {
-		if(parties[0].isLocalParty()  && !brief_out) {
+	for(unsigned int i = 0; i < all_sus.size(); ++i) {
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
 			std::cout << "Starting request for SU " << i + 1 << std::endl;
 		}
 		
 		timer->start(Timer::secure_su_request);
 
-		if(use_grid) {
+		if(sm_params->use_grid) {
 			selected_pus.clear();
 			selected_sss.clear();
-			secureGetEntitiesFromTable(parties, sus[i], grid_table, pu_table, &selected_pus, &selected_sss);
+			secureGetEntitiesFromTable(parties, all_sus[i], grid_table, pu_table, &selected_pus, &selected_sss);
 		}
 		
-		float v = secureRadar(parties, sus[i], selected_pus, selected_sss, &pu_table, &sm_ch);
+		all_sus[i].index = i;
+		float v = secureRadar(parties, all_sus[i], selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
 
 		timer->end(Timer::secure_su_request);
 
 		su_rps.push_back(v);
 
-		if(parties[0].isLocalParty()  && !brief_out) {
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
 			std::cout << "Finished request for SU " << i + 1 << std::endl;
 		}
 	}
 	return su_rps;
 }
 
-void SpectrumManager::secureRadarPreprocess(
-		std::array<Party, 2> parties, const std::vector<PUint>& pus, std::vector<SSint>* sss) const {
-	sInt zero = INPUT(parties, 0, 0, bit_count);
-	sInt one  = INPUT(parties, 0, 1, bit_count);
-	sInt two  = INPUT(parties, 0, 2, bit_count);
-	sInt ten  = INPUT(parties, 0, 10, bit_count);
+std::vector<float> SpectrumManager::runSM(
+		const std::map<int, std::vector<int> >& precomputed_pu_groups,
+		const std::map<int, std::vector<int> >& precomputed_ss_groups,
+		Timer* timer) {
+	std::string address = "127.0.0.1:9000";
 
-	sInt factor_int = INPUT(parties, 0, int(factor), bit_count);
-	sInt large = INPUT(parties, 0, factor * factor * 10, bit_count); // TODO
+	auto session_mode = SessionMode::Client;
+	auto block_type = OneBlock;
+	auto role = ShGcRuntime::Garbler;
 
-	sInt ln_ten = INPUT(parties, 0, int(LN_TEN * factor), bit_count);
+	if(party_id == 0) {
+		session_mode = SessionMode::Client;
+		block_type = OneBlock;
+		role = ShGcRuntime::Garbler;
+	} else if(party_id == 1){
+		session_mode = SessionMode::Server;
+		block_type = ZeroBlock;
+		role = ShGcRuntime::Evaluator;
+	} else {
+		std::cerr << "Invalid party_id: must be either 0 or 1" << std::endl;
+	}
+
+	PRNG prng(block_type);
+	IOService ios;
+
+	Session session(ios, address, session_mode);
+	Channel channel = session.addChannel();
+
+	if(party_id == 1) {
+		channel.waitForConnection();
+	}
+
+	ShGcRuntime runtime;
+	runtime.mDebugFlag = false;
+	runtime.init(channel, prng.get<block>(), role, party_id);
+
+	std::array<Party, 2> parties{
+		Party(runtime, 0),
+		Party(runtime, 1)
+	};
+
+	// Establsih channel between SMs
+	IOService com_ios(sm_params->num_io_threads);
+	Endpoint ep(com_ios, sm_params->server_addr, (parties[0].isLocalParty() ? EpMode::Server : EpMode::Client), sm_params->connection_name);
+	Channel sm_ch = ep.addChannel(sm_params->channel_name);
+	sm_ch.waitForConnection();
+
+	// Establsih channel between the SM and SU server
+	Endpoint ep_su(com_ios, (parties[0].isLocalParty() ? "127.0.0.1:1213" : "127.0.0.1:1214"), EpMode::Client, (parties[0].isLocalParty() ? "sm0-su" : "sm1-su"));
+	Channel su_ch = ep_su.addChannel((parties[0].isLocalParty() ? "sm0-su-channel" : "sm1-su-channel"));
+	su_ch.waitForConnection();
+
+	if(parties[0].isLocalParty() && !(sm_params->brief_out)) {
+		std::cout << "Starting preprocessing" << std::endl;
+	}
+	timer->start(Timer::secure_preprocessing);
+
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
+		if(all_sss[i].received_power_from_pu.size() != all_pus.size()) {
+			std::cerr << "Must precompute rp_from_pu for SM&KS case" << std::endl;
+			exit(1);
+		}
+	}
+
+	std::map<int, std::vector<const SSint*> > ss_groups, en_ss_groups;
+	std::map<int, std::vector<const PUint*> > pu_groups, en_pu_groups;
+
+	GridTable grid_table, en_grid_table;
+	PUTable pu_table, en_pu_table;
+	if(sm_params->use_grid) {
+		if(precomputed_ss_groups.size() > 0) {
+			for(auto itr = precomputed_ss_groups.begin(); itr != precomputed_ss_groups.end(); ++itr) {
+				for(unsigned int i = 0; i < itr->second.size(); ++i) {
+					ss_groups[itr->first].push_back(&all_sss[itr->second[i]]);
+					en_ss_groups[itr->first].push_back(&en_sss[itr->second[i]]);
+				}
+			}
+		} else {
+			std::cerr << "Must precompute groups for SM&KS case" << std::endl;
+			exit(1);
+		}
+
+		if(precomputed_pu_groups.size() > 0) {
+			for(auto itr = precomputed_pu_groups.begin(); itr != precomputed_pu_groups.end(); ++itr) {
+				for(unsigned int i = 0; i < itr->second.size(); ++i) {
+					pu_groups[itr->first].push_back(&all_pus[itr->second[i]]);
+					en_pu_groups[itr->first].push_back(&en_pus[itr->second[i]]);
+				}
+			}
+		} else {
+			std::cerr << "Must precompute groups for SM&KS case" << std::endl;
+			exit(1);
+		}
+
+		buildTables(ss_groups, pu_groups, &grid_table, &pu_table);
+		buildTables(en_ss_groups, en_pu_groups, &en_grid_table, &en_pu_table);
+	}
+
+	if(parties[0].isLocalParty() && !(sm_params->brief_out)) {
+		std::cout << "Finished preprocessing" << std::endl;
+	}
+	timer->end(Timer::secure_preprocessing);
+
+	std::vector<float> su_rps;
+	std::vector<PUint> selected_pus;
+	std::vector<SSint> selected_sss;
+	if(!sm_params->use_grid) {
+		std::cerr << "Must use grid with SM&KS" << std::endl;
+		exit(1);
+	}
+	for(unsigned int i = 0; i < all_sus.size(); ++i) {
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
+			std::cout << "Starting request for SU " << i + 1 << std::endl;
+		}
+		
+		timer->start(Timer::secure_su_request);
+
+		// Send encrypted tables to KS
+		sendEncryptedData(&sm_ch, en_sus[i], en_grid_table, en_pu_table);
+
+		if(sm_params->use_grid) {
+			selected_pus.clear();
+			selected_sss.clear();
+			secureGetEntitiesFromTable(parties, all_sus[i], grid_table, pu_table, &selected_pus, &selected_sss);
+		}
+		
+		all_sus[i].index = i;
+		float v = secureRadar(parties, all_sus[i], selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
+
+		// Get updated PR thresholds form KS
+		recvEncryptedPRThresholds(&sm_ch, &en_pu_table);
+
+		timer->end(Timer::secure_su_request);
+
+		su_rps.push_back(v);
+
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
+			std::cout << "Finished request for SU " << i + 1 << std::endl;
+		}
+	}
+	return su_rps;
+}
+
+std::vector<float> SpectrumManager::runKS(int num_sus) {
+	std::string address = "127.0.0.1:9000";
+
+	auto session_mode = SessionMode::Client;
+	auto block_type = OneBlock;
+	auto role = ShGcRuntime::Garbler;
+
+	if(party_id == 0) {
+		session_mode = SessionMode::Client;
+		block_type = OneBlock;
+		role = ShGcRuntime::Garbler;
+	} else if(party_id == 1){
+		session_mode = SessionMode::Server;
+		block_type = ZeroBlock;
+		role = ShGcRuntime::Evaluator;
+	} else {
+		std::cerr << "Invalid party_id: must be either 0 or 1" << std::endl;
+	}
+
+	PRNG prng(block_type);
+	IOService ios;
+
+	Session session(ios, address, session_mode);
+	Channel channel = session.addChannel();
+
+	if(party_id == 1) {
+		channel.waitForConnection();
+	}
+
+	ShGcRuntime runtime;
+	runtime.mDebugFlag = false;
+	runtime.init(channel, prng.get<block>(), role, party_id);
+
+	std::array<Party, 2> parties{
+		Party(runtime, 0),
+		Party(runtime, 1)
+	};
+
+	// Establsih channel between SMs
+	IOService com_ios(sm_params->num_io_threads);
+	Endpoint ep(com_ios, sm_params->server_addr, (parties[0].isLocalParty() ? EpMode::Server : EpMode::Client), sm_params->connection_name);
+	Channel sm_ch = ep.addChannel(sm_params->channel_name);
+	sm_ch.waitForConnection();
+
+	// Establsih channel between the SM and SU server
+	Endpoint ep_su(com_ios, (parties[0].isLocalParty() ? "127.0.0.1:1213" : "127.0.0.1:1214"), EpMode::Client, (parties[0].isLocalParty() ? "sm0-su" : "sm1-su"));
+	Channel su_ch = ep_su.addChannel((parties[0].isLocalParty() ? "sm0-su-channel" : "sm1-su-channel"));
+	su_ch.waitForConnection();
+
+	SUint su;
+	GridTable grid_table;
+	PUTable pu_table;
+
+	std::vector<float> su_rps;
+	std::vector<PUint> selected_pus;
+	std::vector<SSint> selected_sss;
+	if(!sm_params->use_grid) {
+		std::cerr << "Must use grid with SM&KS" << std::endl;
+		exit(1);
+	}
+	for(int i = 0; i < num_sus; ++i) {
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
+			std::cout << "Starting request for SU " << i + 1 << std::endl;
+		}
+
+		// Send encrypted tables to KS
+		recvEncryptedData(&sm_ch, &su, &grid_table, &pu_table);
+
+		if(sm_params->use_grid) {
+			selected_pus.clear();
+			selected_sss.clear();
+			secureGetEntitiesFromTable(parties, su, grid_table, pu_table, &selected_pus, &selected_sss);
+		}
+		
+		su.index = i;
+		float v = secureRadar(parties, su, selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
+
+		// Send updated PR thresholds form KS
+		sendEncryptedPRThresholds(&sm_ch, pu_table);
+
+		su_rps.push_back(v);
+
+		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
+			std::cout << "Finished request for SU " << i + 1 << std::endl;
+		}
+	}
+	return su_rps;
+}
+
+void SpectrumManager::secureRadarPreprocess(std::array<Party, 2> parties) {
+	sInt zero = INPUT(parties, 0, 0, sm_params->bit_count);
+	sInt one  = INPUT(parties, 0, 1, sm_params->bit_count);
+	sInt two  = INPUT(parties, 0, 2, sm_params->bit_count);
+	sInt ten  = INPUT(parties, 0, 10, sm_params->bit_count);
+
+	sInt factor_int = INPUT(parties, 0, int(sm_params->factor), sm_params->bit_count);
+	sInt large = INPUT(parties, 0, sm_params->factor * sm_params->factor * 10, sm_params->bit_count); // TODO
+
+	sInt ln_ten = INPUT(parties, 0, int(LN_TEN * sm_params->factor), sm_params->bit_count);
 
 	// PU
 	std::vector<sInt> pus_x;
 	std::vector<sInt> pus_y;
-	for(unsigned int i = 0; i < pus.size(); ++i) {
-		sInt pu_x_a = INPUT(parties, 0, pus[i].loc.x, bit_count);
-		sInt pu_x_b = INPUT(parties, 1, pus[i].loc.x, bit_count);
+	for(unsigned int i = 0; i < all_pus.size(); ++i) {
+		sInt pu_x_a = INPUT(parties, 0, all_pus[i].loc.x, sm_params->bit_count);
+		sInt pu_x_b = INPUT(parties, 1, all_pus[i].loc.x, sm_params->bit_count);
 
 		pus_x.push_back(pu_x_a + pu_x_b);
 
-		sInt pu_y_a = INPUT(parties, 0, pus[i].loc.y, bit_count);
-		sInt pu_y_b = INPUT(parties, 1, pus[i].loc.y, bit_count);
+		sInt pu_y_a = INPUT(parties, 0, all_pus[i].loc.y, sm_params->bit_count);
+		sInt pu_y_b = INPUT(parties, 1, all_pus[i].loc.y, sm_params->bit_count);
 
 		pus_y.push_back(pu_y_a + pu_y_b);
 	}
@@ -234,19 +456,19 @@ void SpectrumManager::secureRadarPreprocess(
 	std::vector<sInt> sss_x;
 	std::vector<sInt> sss_y;
 	std::vector<sInt> sss_rp;
-	for(unsigned int i = 0; i < sss->size(); ++i) {
-		sInt ss_x_a = INPUT(parties, 0, (*sss)[i].loc.x, bit_count);
-		sInt ss_x_b = INPUT(parties, 1, (*sss)[i].loc.x, bit_count);
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
+		sInt ss_x_a = INPUT(parties, 0, all_sss[i].loc.x, sm_params->bit_count);
+		sInt ss_x_b = INPUT(parties, 1, all_sss[i].loc.x, sm_params->bit_count);
 
 		sss_x.push_back(ss_x_a + ss_x_b);
 
-		sInt ss_y_a = INPUT(parties, 0, (*sss)[i].loc.y, bit_count);
-		sInt ss_y_b = INPUT(parties, 1, (*sss)[i].loc.y, bit_count);
+		sInt ss_y_a = INPUT(parties, 0, all_sss[i].loc.y, sm_params->bit_count);
+		sInt ss_y_b = INPUT(parties, 1, all_sss[i].loc.y, sm_params->bit_count);
 		
 		sss_y.push_back(ss_y_a + ss_y_b);
 
-		sInt ss_rp_a = INPUT(parties, 0, (*sss)[i].received_power, bit_count);
-		sInt ss_rp_b = INPUT(parties, 1, (*sss)[i].received_power, bit_count);
+		sInt ss_rp_a = INPUT(parties, 0, all_sss[i].received_power, sm_params->bit_count);
+		sInt ss_rp_b = INPUT(parties, 1, all_sss[i].received_power, sm_params->bit_count);
 		
 		sss_rp.push_back(ss_rp_a + ss_rp_b);
 	}
@@ -256,36 +478,36 @@ void SpectrumManager::secureRadarPreprocess(
 	// |----------------------------------|
 	std::vector<std::vector<sInt> > sss_rp_from_pu_a;
 	std::vector<std::vector<sInt> > sss_rp_from_pu_b;
-	for(unsigned int i = 0; i < sss->size(); ++i) {
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
 		std::vector<sInt> rp_weights;
-		sInt sum_rp_weights = INPUT(parties, 0, 0, bit_count);
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			sInt dist_to_rp_alpha = INPUT(parties, 0, 1, bit_count);
+		sInt sum_rp_weights = INPUT(parties, 0, 0, sm_params->bit_count);
+		for(unsigned int j = 0; j < all_pus.size(); ++j) {
+			sInt dist_to_rp_alpha = INPUT(parties, 0, 1, sm_params->bit_count);
 
-			if(rp_alpha == 1) {
+			if(sm_params->rp_alpha == 1) {
 				sInt dist;
 				utils::dist(&dist, sss_x[i], sss_y[i], pus_x[j], pus_y[j], zero, two, 10);
 
 				dist_to_rp_alpha = dist_to_rp_alpha * dist;
-			} else if(rp_alpha == 2) {
+			} else if(sm_params->rp_alpha == 2) {
 				sInt x_diff = sss_x[i] - pus_x[j];
 				sInt y_diff = sss_y[i] - pus_y[j];
 				sInt dist_squared = (x_diff * x_diff +  y_diff * y_diff) / factor_int;
 
 				dist_to_rp_alpha = dist_to_rp_alpha * dist_squared;
-			} else if(rp_alpha == 3) {
+			} else if(sm_params->rp_alpha == 3) {
 				sInt dist;
 				utils::dist(&dist, sss_x[i], sss_y[i], pus_x[j], pus_y[j], zero, two, 10);
 
 				sInt dist_squared = ((sss_x[i] - pus_x[j]) * (sss_x[i] - pus_x[j]) + (sss_y[i] - pus_y[j]) * (sss_y[i] - pus_y[j])) / factor_int;
 
 				dist_to_rp_alpha = dist_to_rp_alpha * dist * dist_squared / factor_int;
-			} else if(rp_alpha == 4) {
+			} else if(sm_params->rp_alpha == 4) {
 				sInt dist_squared = ((sss_x[i] - pus_x[j]) * (sss_x[i] - pus_x[j]) + (sss_y[i] - pus_y[j]) * (sss_y[i] - pus_y[j])) / factor_int;
 
 				dist_to_rp_alpha = dist_to_rp_alpha * dist_squared * dist_squared / factor_int;
 			} else {
-				std::cerr << "Invalid value for rp_alpha: " << rp_alpha << std::endl;
+				std::cerr << "Invalid value for rp_alpha: " << sm_params->rp_alpha << std::endl;
 				exit(0);
 			}
 
@@ -298,7 +520,7 @@ void SpectrumManager::secureRadarPreprocess(
 
 		sss_rp_from_pu_a.push_back(std::vector<sInt>());
 		sss_rp_from_pu_b.push_back(std::vector<sInt>());
-		for(unsigned int j = 0; j < pus.size(); ++j) {
+		for(unsigned int j = 0; j < all_pus.size(); ++j) {
 			sInt sss_rp_from_pu;
 			if(utils::unit_type == utils::UnitType::ABS) {
 				sss_rp_from_pu = rp_weights[j] * sss_rp[i] / sum_rp_weights;
@@ -313,39 +535,38 @@ void SpectrumManager::secureRadarPreprocess(
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);
 			}
-			sss_rp_from_pu_a[i].push_back(INPUT(parties, 0, splitRandVal(), bit_count));
+			sss_rp_from_pu_a[i].push_back(INPUT(parties, 0, splitRandVal(), sm_params->bit_count));
 			sss_rp_from_pu_b[i].push_back(sss_rp_from_pu - sss_rp_from_pu_a[i][j]);
 		}
 	}
 
 	// Add computed values to plaintext_sss_rp_from_pu.
-	for(unsigned int i = 0; i < sss->size(); ++i) {
-		for(unsigned int j = 0; j < pus.size(); ++j) {
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
+		for(unsigned int j = 0; j < all_pus.size(); ++j) {
 			parties[0].reveal(sss_rp_from_pu_a[i][j]);
 			parties[1].reveal(sss_rp_from_pu_b[i][j]);
 			if(parties[0].isLocalParty()) {
-				(*sss)[i].received_power_from_pu.push_back(sss_rp_from_pu_a[i][j].getValue());
+				all_sss[i].received_power_from_pu.push_back(sss_rp_from_pu_a[i][j].getValue());
 			} else if(parties[1].isLocalParty()) {
-				(*sss)[i].received_power_from_pu.push_back(sss_rp_from_pu_b[i][j].getValue());
+				all_sss[i].received_power_from_pu.push_back(sss_rp_from_pu_b[i][j].getValue());
 			}
 		}
-		exit(1);
 	}
 }
 
-void SpectrumManager::plainTextRadarPreprocess(
+void PlaintextSpectrumManager::plainTextRadarPreprocess(
 		const std::vector<PUint>& pus_int0, const std::vector<PUint>& pus_int1,
 		std::vector<SSint>* sss_int0, std::vector<SSint>* sss_int1) const {
 	// Works only if bit_count is <= 64
-	if(bit_count > 64) {
+	if(sm_params->bit_count > 64) {
 		std::cerr << "Unsupported value for bit_count" << std::endl;
 		exit(1);
 	}
 	// Must Bitwise And the result of any operations.
-	llong bit_mask = (1 << bit_count) - 1;
+	llong bit_mask = (1 << sm_params->bit_count) - 1;
 
-	llong factor_int = llong(factor);
-	llong ln_ten_int = llong(LN_TEN * factor);
+	llong factor_int = llong(sm_params->factor);
+	llong ln_ten_int = llong(LN_TEN * sm_params->factor);
 
 	int log_calc_iters = LOG_CALC_ITERS;
 
@@ -356,13 +577,13 @@ void SpectrumManager::plainTextRadarPreprocess(
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
 			// Compute weight
 			llong dist = 0;
-			if(rp_alpha == 2) {
+			if(sm_params->rp_alpha == 2) {
 				llong x_diff = (((pus_int0[j].loc.x + pus_int1[j].loc.x) ^ bit_mask) - (((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) ^ bit_mask)) ^ bit_mask;
 				llong y_diff = (((pus_int0[j].loc.y + pus_int1[j].loc.y) ^ bit_mask) - (((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) ^ bit_mask)) ^ bit_mask;
 
 				dist = ((((x_diff * x_diff) ^ bit_mask) + ((y_diff * y_diff) ^ bit_mask)) / factor_int) ^ bit_mask;
 			} else {
-				std::cerr << "(Currently) Unsupported rp_alpha: " << rp_alpha << std::endl;
+				std::cerr << "(Currently) Unsupported rp_alpha: " << sm_params->rp_alpha << std::endl;
 				exit(1);
 			}
 
@@ -425,42 +646,41 @@ void SpectrumManager::plainTextRadarPreprocess(
 	}
 }
 
-std::map<int, std::vector<const SSint*> > SpectrumManager::secureSSGridPreprocess(
-		std::array<Party, 2> parties, const std::vector<SSint>& sss) const {
+std::map<int, std::vector<const SSint*> > SpectrumManager::secureSSGridPreprocess(std::array<Party, 2> parties) {
 	// Inits the valid groups.
 	std::map<int, std::vector<const SSint*> > orig_ss_groups;
 	std::map<int, std::vector<const SSint*> > ss_groups;
-	for(int group_id = 0; group_id < grid_num_x * grid_num_y; ++group_id) {
+	for(int group_id = 0; group_id < sm_params->grid_num_x * sm_params->grid_num_y; ++group_id) {
 		ss_groups[group_id];
 		orig_ss_groups[group_id];
 	}
 
 	// Constants
-	sInt zero = INPUT(parties, 0, 0, bit_count);
-	sInt neg_one = INPUT(parties, 0, -1, bit_count);
+	sInt zero = INPUT(parties, 0, 0, sm_params->bit_count);
+	sInt neg_one = INPUT(parties, 0, -1, sm_params->bit_count);
 
-	sInt secure_grid_num_x = INPUT(parties, 0, grid_num_x, bit_count);
+	sInt secure_grid_num_x = INPUT(parties, 0, sm_params->grid_num_x, sm_params->bit_count);
 
-	sInt secure_grid_delta_x = INPUT(parties, 0, int(grid_delta_x * factor), bit_count);
-	sInt secure_grid_delta_y = INPUT(parties, 0, int(grid_delta_y * factor), bit_count);
+	sInt secure_grid_delta_x = INPUT(parties, 0, int(sm_params->grid_delta_x * sm_params->factor), sm_params->bit_count);
+	sInt secure_grid_delta_y = INPUT(parties, 0, int(sm_params->grid_delta_y * sm_params->factor), sm_params->bit_count);
 
 	// SS
 	std::vector<sInt> ss_xs;
 	std::vector<sInt> ss_ys;
-	for(unsigned int i = 0; i < sss.size(); ++i) {
-		sInt ss_x_a = INPUT(parties, 0, sss[i].loc.x, bit_count);
-		sInt ss_x_b = INPUT(parties, 1, sss[i].loc.x, bit_count);
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
+		sInt ss_x_a = INPUT(parties, 0, all_sss[i].loc.x, sm_params->bit_count);
+		sInt ss_x_b = INPUT(parties, 1, all_sss[i].loc.x, sm_params->bit_count);
 
 		ss_xs.push_back(ss_x_a + ss_x_b);
 
-		sInt ss_y_a = INPUT(parties, 0, sss[i].loc.y, bit_count);
-		sInt ss_y_b = INPUT(parties, 1, sss[i].loc.y, bit_count);
+		sInt ss_y_a = INPUT(parties, 0, all_sss[i].loc.y, sm_params->bit_count);
+		sInt ss_y_b = INPUT(parties, 1, all_sss[i].loc.y, sm_params->bit_count);
 		
 		ss_ys.push_back(ss_y_a + ss_y_b);
 	}
 
 	// Compute group_id for each SS, and put it in the group.
-	for(unsigned int i = 0; i < sss.size(); ++i) {
+	for(unsigned int i = 0; i < all_sss.size(); ++i) {
 		sInt group_id_a = ss_xs[i] / secure_grid_delta_x + ss_ys[i] / secure_grid_delta_y * secure_grid_num_x;
 		sInt group_id_b = group_id_a + zero;
 
@@ -482,27 +702,27 @@ std::map<int, std::vector<const SSint*> > SpectrumManager::secureSSGridPreproces
 			exit(1);
 		}
 
-		itr->second.push_back(&sss[i]);
+		itr->second.push_back(&all_sss[i]);
 	}
 
 	// Expand each group to the grid_min_num_ss.
-	const int max_iters = all_deviations.size();
-	const unsigned int min_num = numSelect(grid_min_num_ss, sss.size());
-	for(int start_i = 0; start_i < grid_num_x; ++start_i) {
-		for(int start_j = 0; start_j < grid_num_y; ++start_j) {
-			int plain_group_id = start_i + start_j * grid_num_x;
+	const int max_iters = sm_params->all_deviations.size();
+	const unsigned int min_num = numSelect(sm_params->grid_min_num_ss, all_sss.size());
+	for(int start_i = 0; start_i < sm_params->grid_num_x; ++start_i) {
+		for(int start_j = 0; start_j < sm_params->grid_num_y; ++start_j) {
+			int plain_group_id = start_i + start_j * sm_params->grid_num_x;
 			auto grid_loc_itr = ss_groups.find(plain_group_id);
 
 			int iter = 0;
 			while(grid_loc_itr->second.size() < min_num && iter < max_iters) {
-				const std::vector<std::pair<int, int> > devs = getDeviations(iter);
+				const std::vector<std::pair<int, int> > devs = sm_params->getDeviations(iter);
 				for(unsigned int x = 0; x < devs.size(); ++x) {
 					int this_i = start_i + devs[x].first;
 					int this_j = start_j + devs[x].second;
 
 					int this_group_id = -1;
-					if(this_i >= 0 && this_i < grid_num_x && this_j >= 0 && this_j < grid_num_y) {
-						this_group_id = this_i + this_j * grid_num_x;
+					if(this_i >= 0 && this_i < sm_params->grid_num_x && this_j >= 0 && this_j < sm_params->grid_num_y) {
+						this_group_id = this_i + this_j * sm_params->grid_num_x;
 					}
 
 					auto itr = orig_ss_groups.find(this_group_id);
@@ -524,8 +744,7 @@ std::map<int, std::vector<const SSint*> > SpectrumManager::secureSSGridPreproces
 	return ss_groups;
 }
 
-std::map<int, std::vector<const PUint*> > SpectrumManager::securePUGridPreprocess(
-		std::array<Party, 2> parties, const std::vector<PUint>& pus) const {
+std::map<int, std::vector<const PUint*> > SpectrumManager::securePUGridPreprocess(std::array<Party, 2> parties) {
 	std::cerr << "Not implemented" << std::endl;
 	exit(1);
 
@@ -535,22 +754,22 @@ std::map<int, std::vector<const PUint*> > SpectrumManager::securePUGridPreproces
 void SpectrumManager::secureGetEntitiesFromTable(std::array<Party, 2> parties, const SUint& su,
 		const GridTable& grid_table, const PUTable& pu_table,
 		std::vector<PUint>* selected_pus, std::vector<SSint>* selected_sss) const {
-	sInt zero =    INPUT(parties, 0, 0,  bit_count);
-	sInt neg_one = INPUT(parties, 0, -1, bit_count);
+	sInt zero =    INPUT(parties, 0, 0,  sm_params->bit_count);
+	sInt neg_one = INPUT(parties, 0, -1, sm_params->bit_count);
 
-	sInt secure_grid_num_x = INPUT(parties, 0, grid_num_x, bit_count);
+	sInt secure_grid_num_x = INPUT(parties, 0, sm_params->grid_num_x, sm_params->bit_count);
 
-	sInt secure_grid_delta_x = INPUT(parties, 0, int(grid_delta_x * factor), bit_count);
-	sInt secure_grid_delta_y = INPUT(parties, 0, int(grid_delta_y * factor), bit_count);
+	sInt secure_grid_delta_x = INPUT(parties, 0, int(sm_params->grid_delta_x * sm_params->factor), sm_params->bit_count);
+	sInt secure_grid_delta_y = INPUT(parties, 0, int(sm_params->grid_delta_y * sm_params->factor), sm_params->bit_count);
 
 	// SU
-	sInt su_x_a = INPUT(parties, 0, su.loc.x, bit_count);
-	sInt su_x_b = INPUT(parties, 1, su.loc.x, bit_count);
+	sInt su_x_a = INPUT(parties, 0, su.loc.x, sm_params->bit_count);
+	sInt su_x_b = INPUT(parties, 1, su.loc.x, sm_params->bit_count);
 
 	sInt su_i = (su_x_a + su_x_b) / secure_grid_delta_x;
 
-	sInt su_y_a = INPUT(parties, 0, su.loc.y, bit_count);
-	sInt su_y_b = INPUT(parties, 1, su.loc.y, bit_count);
+	sInt su_y_a = INPUT(parties, 0, su.loc.y, sm_params->bit_count);
+	sInt su_y_b = INPUT(parties, 1, su.loc.y, sm_params->bit_count);
 
 	sInt su_j = (su_y_a + su_y_b) / secure_grid_delta_y;
 
@@ -596,79 +815,93 @@ void SpectrumManager::secureGetEntitiesFromTable(std::array<Party, 2> parties, c
 float SpectrumManager::secureRadar(
 		std::array<Party, 2> parties, const SUint& su,
 		const std::vector<PUint>& pus, const std::vector<SSint>& sss,
-		PUTable* pu_table, Channel* sm_ch) const {
+		PUTable* pu_table, Channel* sm_ch, Channel* su_ch) const {
 	// Constants
-	sInt zero = INPUT(parties, 0,  0, bit_count);
-	sInt one  = INPUT(parties, 0,  1, bit_count);
-	sInt two  = INPUT(parties, 0,  2, bit_count);
-	sInt ten  = INPUT(parties, 0, 10, bit_count);
+	sInt zero = INPUT(parties, 0,  0, sm_params->bit_count);
+	sInt one  = INPUT(parties, 0,  1, sm_params->bit_count);
+	sInt two  = INPUT(parties, 0,  2, sm_params->bit_count);
+	sInt ten  = INPUT(parties, 0, 10, sm_params->bit_count);
 
-	sInt factor_int = INPUT(parties, 0, int(factor), bit_count);
-	sInt large = INPUT(parties, 0, factor * factor * 10, bit_count); // TODO
-	sInt ln_ten = INPUT(parties, 0, int(LN_TEN * factor), bit_count);
+	sInt factor_int = INPUT(parties, 0, int(sm_params->factor), sm_params->bit_count);
+	sInt large = INPUT(parties, 0, sm_params->factor * sm_params->factor * 10, sm_params->bit_count); // TODO
+	sInt ln_ten = INPUT(parties, 0, int(LN_TEN * sm_params->factor), sm_params->bit_count);
 
 	// |------------------|
 	// |  Combine values  |
 	// |------------------|
 	// SU
-	sInt su_x_a = INPUT(parties, 0, su.loc.x, bit_count);
-	sInt su_x_b = INPUT(parties, 1, su.loc.x, bit_count);
+	sInt su_x_a = INPUT(parties, 0, su.loc.x, sm_params->bit_count);
+	sInt su_x_b = INPUT(parties, 1, su.loc.x, sm_params->bit_count);
 
 	sInt su_x = su_x_a + su_x_b;
 
-	sInt su_y_a = INPUT(parties, 0, su.loc.y, bit_count);
-	sInt su_y_b = INPUT(parties, 1, su.loc.y, bit_count);
-
+	sInt su_y_a = INPUT(parties, 0, su.loc.y, sm_params->bit_count);
+	sInt su_y_b = INPUT(parties, 1, su.loc.y, sm_params->bit_count);
 	sInt su_y = su_y_a + su_y_b;
 
 	// PU
-	unsigned int k_pu = numSelect(this->num_pu_selection, pus.size());
+	unsigned int k_pu = numSelect(sm_params->num_pu_selection, pus.size());
 	std::vector<sInt> pus_x;
 	std::vector<sInt> pus_y;
 	std::vector<sInt> pus_tp;
-	std::vector<sInt> prs_thresh;
+	std::vector<std::vector<sInt> > prs_x;
+	std::vector<std::vector<sInt> > prs_y;
+	std::vector<std::vector<sInt> > prs_thresh;
 	std::vector<sInt> pu_table_index;
 	for(unsigned int i = 0; i < pus.size(); ++i) {
-		if(k_pu < pus.size()) {	
-			sInt pu_x_a = INPUT(parties, 0, pus[i].loc.x, bit_count);
-			sInt pu_x_b = INPUT(parties, 1, pus[i].loc.x, bit_count);
+		sInt pu_x_a = INPUT(parties, 0, pus[i].loc.x, sm_params->bit_count);
+		sInt pu_x_b = INPUT(parties, 1, pus[i].loc.x, sm_params->bit_count);
 
-			pus_x.push_back(pu_x_a + pu_x_b);
+		pus_x.push_back(pu_x_a + pu_x_b);
 
-			sInt pu_y_a = INPUT(parties, 0, pus[i].loc.y, bit_count);
-			sInt pu_y_b = INPUT(parties, 1, pus[i].loc.y, bit_count);
+		sInt pu_y_a = INPUT(parties, 0, pus[i].loc.y, sm_params->bit_count);
+		sInt pu_y_b = INPUT(parties, 1, pus[i].loc.y, sm_params->bit_count);
 
-			pus_y.push_back(pu_y_a + pu_y_b);
-		}
+		pus_y.push_back(pu_y_a + pu_y_b);
 
-		sInt pu_tp_a = INPUT(parties, 0, pus[i].transmit_power, bit_count);
-		sInt pu_tp_b = INPUT(parties, 1, pus[i].transmit_power, bit_count);
+		sInt pu_tp_a = INPUT(parties, 0, pus[i].transmit_power, sm_params->bit_count);
+		sInt pu_tp_b = INPUT(parties, 1, pus[i].transmit_power, sm_params->bit_count);
 	
 		pus_tp.push_back(pu_tp_a + pu_tp_b);
-	
-		sInt pr_thresh_a = INPUT(parties, 0, pus[i].prs[0].threshold, bit_count);
-		sInt pr_thresh_b = INPUT(parties, 1, pus[i].prs[0].threshold, bit_count);
-	
-		prs_thresh.push_back(pr_thresh_a + pr_thresh_b);
 
+		prs_x.push_back(std::vector<sInt>());
+		prs_y.push_back(std::vector<sInt>());
+		prs_thresh.push_back(std::vector<sInt>());
+		for(unsigned int j = 0; j < pus[i].prs.size(); ++j) {
+			sInt pr_x_a = INPUT(parties, 0, pus[i].prs[j].loc.x, sm_params->bit_count);
+			sInt pr_x_b = INPUT(parties, 1, pus[i].prs[j].loc.x, sm_params->bit_count);
+			
+			prs_x[i].push_back(pr_x_a + pr_x_b);
+
+			sInt pr_y_a = INPUT(parties, 0, pus[i].prs[j].loc.y, sm_params->bit_count);
+			sInt pr_y_b = INPUT(parties, 1, pus[i].prs[j].loc.y, sm_params->bit_count);
+			
+			prs_y[i].push_back(pr_y_a + pr_y_b);
+
+			sInt pr_thresh_a = INPUT(parties, 0, pus[i].prs[j].threshold, sm_params->bit_count);
+			sInt pr_thresh_b = INPUT(parties, 1, pus[i].prs[j].threshold, sm_params->bit_count);
+			
+			prs_thresh[i].push_back(pr_thresh_a + pr_thresh_b);
+		}
+	
 		// TODO Get the halves
-		sInt pu_index_a = INPUT(parties, 0, pus[i].index, bit_count);
+		sInt pu_index_a = INPUT(parties, 0, pus[i].index, sm_params->bit_count);
 
 		pu_table_index.push_back(pu_index_a + zero);
 	}
 
 	// SS
-	unsigned int k_ss = numSelect(this->num_ss_selection, sss.size());
+	unsigned int k_ss = numSelect(sm_params->num_ss_selection, sss.size());
 
 	// Get the indices of SS to load
 	std::vector<int> sss_load_inds;
-	if(selection_algo == SpectrumManager::SelectionAlgo::NONE ||
-			selection_algo == SpectrumManager::SelectionAlgo::SORT) {
+	if(sm_params->selection_algo == SMParams::SelectionAlgo::NONE ||
+			sm_params->selection_algo == SMParams::SelectionAlgo::SORT) {
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			sss_load_inds.push_back(i);
 		}
 		// Nothing has to be done now.
-	} else if(selection_algo == SpectrumManager::SelectionAlgo::RANDOM) {
+	} else if(sm_params->selection_algo == SMParams::SelectionAlgo::RANDOM) {
 		std::vector<int> all_inds;
 		if(parties[0].isLocalParty()) {
 			for(unsigned int i = 0; i < sss.size(); ++i) {
@@ -678,7 +911,7 @@ float SpectrumManager::secureRadar(
 		}
 
 		for(unsigned int i = 0; i < k_ss; ++i) {
-			sInt rand_ind_a = INPUT(parties, 0, all_inds[i], bit_count);
+			sInt rand_ind_a = INPUT(parties, 0, all_inds[i], sm_params->bit_count);
 			sInt rand_ind_b = rand_ind_a + zero;
 
 			parties[0].reveal(rand_ind_a);
@@ -702,13 +935,13 @@ float SpectrumManager::secureRadar(
 	for(unsigned int x = 0; x < sss_load_inds.size(); ++x) {
 		int i = sss_load_inds[x];
 
-		sInt ss_x_a = INPUT(parties, 0, sss[i].loc.x, bit_count);
-		sInt ss_x_b = INPUT(parties, 1, sss[i].loc.x, bit_count);
+		sInt ss_x_a = INPUT(parties, 0, sss[i].loc.x, sm_params->bit_count);
+		sInt ss_x_b = INPUT(parties, 1, sss[i].loc.x, sm_params->bit_count);
 
 		sss_x.push_back(ss_x_a + ss_x_b);
 
-		sInt ss_y_a = INPUT(parties, 0, sss[i].loc.y, bit_count);
-		sInt ss_y_b = INPUT(parties, 1, sss[i].loc.y, bit_count);
+		sInt ss_y_a = INPUT(parties, 0, sss[i].loc.y, sm_params->bit_count);
+		sInt ss_y_b = INPUT(parties, 1, sss[i].loc.y, sm_params->bit_count);
 		
 		sss_y.push_back(ss_y_a + ss_y_b);
 	}
@@ -725,8 +958,8 @@ float SpectrumManager::secureRadar(
 				exit(1);
 			}
 
-			sInt sss_rp_from_pu_a = INPUT(parties, 0, sss[i].received_power_from_pu[j], bit_count);
-			sInt sss_rp_from_pu_b = INPUT(parties, 1, sss[i].received_power_from_pu[j], bit_count);
+			sInt sss_rp_from_pu_a = INPUT(parties, 0, sss[i].received_power_from_pu[j], sm_params->bit_count);
+			sInt sss_rp_from_pu_b = INPUT(parties, 1, sss[i].received_power_from_pu[j], sm_params->bit_count);
 
 			sss_rp_from_pu[x].push_back(sss_rp_from_pu_a + sss_rp_from_pu_b);
 		}
@@ -738,13 +971,16 @@ float SpectrumManager::secureRadar(
 	// |----------------------------|
 	std::vector<int> pu_inds;
 	if(k_pu < pus.size()) {
+		std::cerr << "No longer supported" << std::endl;
+		exit(1);
+
 		std::vector<sInt> secret_pu_inds;
 		std::vector<sInt> secret_pu_dists;
 		for(unsigned int i = 0; i < pus.size(); ++i) {
 			sInt x_diff = su_x - pus_x[i];
 			sInt y_diff = su_y - pus_y[i];
 			sInt dist_pu_su = (x_diff * x_diff + y_diff * y_diff) / factor_int;
-			sInt ind = INPUT(parties, 0, i, bit_count);
+			sInt ind = INPUT(parties, 0, i, sm_params->bit_count);
 
 			if(i < k_pu) {
 				secret_pu_inds.push_back(ind + zero);
@@ -786,71 +1022,71 @@ float SpectrumManager::secureRadar(
 	// |----------------------------|
 	std::vector<int> sss_inds;
 	std::vector<sInt> secret_sss_dists;
-	if(selection_algo == SpectrumManager::SelectionAlgo::NONE ||
-			selection_algo == SpectrumManager::SelectionAlgo::RANDOM) {
+	if(sm_params->selection_algo == SMParams::SelectionAlgo::NONE ||
+			sm_params->selection_algo == SMParams::SelectionAlgo::RANDOM) {
 		for(unsigned int i = 0; i < k_ss; ++i) {
 			sss_inds.push_back(i);
 
-			sInt dist_to_pl_alpha = INPUT(parties, 0, 1, bit_count);
+			sInt dist_to_pl_alpha = INPUT(parties, 0, 1, sm_params->bit_count);
 
-			if(pl_alpha == 1) {
+			if(sm_params->pl_alpha == 1) {
 				sInt dist;
 				utils::dist(&dist, su_x, su_y, sss_x[i], sss_y[i], zero, two, 10);
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist;
-			} else if(pl_alpha == 2) {
+			} else if(sm_params->pl_alpha == 2) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared;
-			} else if(pl_alpha == 3) {
+			} else if(sm_params->pl_alpha == 3) {
 				sInt dist;
 				utils::dist(&dist, su_x, su_y, sss_x[i], sss_y[i], zero, two, 10);
 				
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist * dist_squared / factor_int;
-			} else if(pl_alpha == 4) {
+			} else if(sm_params->pl_alpha == 4) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared * dist_squared / factor_int;
 			} else {
-				std::cerr << "Invalid value of pl_alpha: " << pl_alpha << std::endl;
+				std::cerr << "A Invalid value of pl_alpha: " << sm_params->pl_alpha << std::endl;
 				exit(0);
 			}
 
 			secret_sss_dists.push_back(dist_to_pl_alpha + zero);
 		}
-	} else if(selection_algo == SpectrumManager::SelectionAlgo::SORT) {
+	} else if(sm_params->selection_algo == SMParams::SelectionAlgo::SORT) {
 		std::vector<sInt> secret_sss_inds;
 		for(unsigned int i = 0; i < sss.size(); ++i) {
-			sInt dist_to_pl_alpha = INPUT(parties, 0, 1, bit_count);
+			sInt dist_to_pl_alpha = INPUT(parties, 0, 1, sm_params->bit_count);
 
-			if(pl_alpha == 1) {
+			if(sm_params->pl_alpha == 1) {
 				sInt dist;
 				utils::dist(&dist, su_x, su_y, sss_x[i], sss_y[i], zero, two, 10);
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist;
-			} else if(pl_alpha == 2) {
+			} else if(sm_params->pl_alpha == 2) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared;
-			} else if(pl_alpha == 3) {
+			} else if(sm_params->pl_alpha == 3) {
 				sInt dist;
 				utils::dist(&dist, su_x, su_y, sss_x[i], sss_y[i], zero, two, 10);
 				
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist * dist_squared / factor_int;
-			} else if(pl_alpha == 4) {
+			} else if(sm_params->pl_alpha == 4) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared * dist_squared / factor_int;
 			} else {
-				std::cerr << "Invalid value of pl_alpha: " << pl_alpha << std::endl;
+				std::cerr << "B Invalid value of pl_alpha: " << sm_params->pl_alpha << std::endl;
 				exit(0);
 			}
 
-			sInt ind = INPUT(parties, 0, i, bit_count);
+			sInt ind = INPUT(parties, 0, i, sm_params->bit_count);
 
 			if(i < k_ss) {
 				secret_sss_inds.push_back(ind + zero);
@@ -893,7 +1129,7 @@ float SpectrumManager::secureRadar(
 	// |----------------------|
 	// w = (1 / d(SU, SS))
 	std::vector<sInt> sss_w;
-	sInt sum_weight = INPUT(parties, 0, 0, bit_count);
+	sInt sum_weight = INPUT(parties, 0, 0, sm_params->bit_count);
 	for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 		// Check if dist is small
 		sInt is_dist_small = secret_sss_dists[x] <= one;
@@ -906,11 +1142,13 @@ float SpectrumManager::secureRadar(
 	// |  Compute transmit power of SU  |
 	// |--------------------------------|
 	// su_rp = pr_thresh * sum(w(SS)) / (sum(r(SS)/t(PU) * w(SS)))
-	sInt su_tp = INPUT(parties, 0, 0, bit_count);
+	sInt su_tp = INPUT(parties, 0, 0, sm_params->bit_count);
+	sInt pl_est_gamma = INPUT(parties, 0, int(sm_params->pl_est_gamma * sm_params->factor), sm_params->bit_count);
+	sInt two_int = INPUT(parties, 0, 2, sm_params->bit_count);
 	std::vector<std::vector<sInt> > path_loss_su_pr; // path_loss_su_pr[i][j] is the path loss between the su and PU i's PR j.
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
 		unsigned int j = pu_inds[y];
-		sInt sum_weighted_ratio = INPUT(parties, 0, 0, bit_count);
+		sInt sum_weighted_ratio = INPUT(parties, 0, 0, sm_params->bit_count);
 
 		path_loss_su_pr.push_back(std::vector<sInt>());
 		for(unsigned int x = 0; x < sss_inds.size(); ++x) {
@@ -924,57 +1162,86 @@ float SpectrumManager::secureRadar(
 				exit(1);
 			}
 		}
-	
-		sInt this_su_tp;
-		if(utils::unit_type == utils::UnitType::ABS) {
-			sInt swr_zero = sum_weighted_ratio < one;
-			this_su_tp = swr_zero.ifelse(zero, prs_thresh[j] * sum_weight / sum_weighted_ratio);
-			path_loss_su_pr[j].push_back(swr_zero.ifelse(zero, factor_int * sum_weight / sum_weighted_ratio));
-		} else if(utils::unit_type == utils::UnitType::DB) {
-			this_su_tp = prs_thresh[j] - factor_int * sum_weighted_ratio / sum_weight;
-			path_loss_su_pr[j].push_back(factor_int * sum_weighted_ratio / sum_weight);
-		} else {
-			std::cerr << "Unsupported unit_type" << std::endl;
-			exit(1);
-		}
+ 
+		sInt pu_est_path_loss = factor_int * sum_weighted_ratio / sum_weight;
+
+		sInt pu_x_diff = su_x - pus_x[j];
+		sInt pu_y_diff = su_y - pus_y[j];
+		sInt su_pu_dist_squared = (pu_x_diff * pu_x_diff + pu_y_diff * pu_y_diff) / factor_int;
+
+		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+			sInt pr_x_diff = su_x - prs_x[j][x];
+			sInt pr_y_diff = su_y - prs_y[j][x];
+			sInt su_pr_dist_squared = (pr_x_diff * pr_x_diff + pr_y_diff * pr_y_diff) / factor_int;
+
+			sInt dist_ratio = factor_int * su_pr_dist_squared / su_pu_dist_squared;
+		
+			sInt log_dist_ratio;
+			utils::secureLog10(&log_dist_ratio, dist_ratio, zero, factor_int, ln_ten, LOG_CALC_ITERS);
+			sInt pr_est_path_loss = pu_est_path_loss + ten * pl_est_gamma / factor_int * log_dist_ratio / factor_int / two_int;
+		
+			sInt this_su_tp;
+			if(utils::unit_type == utils::UnitType::ABS) {
+				sInt pl_zero = pr_est_path_loss < one;
+				this_su_tp = pl_zero.ifelse(zero, factor_int * prs_thresh[j][x] / pr_est_path_loss);
+			} else if(utils::unit_type == utils::UnitType::DB) {
+				this_su_tp = prs_thresh[j][x] - pr_est_path_loss;
+			} else {
+				std::cerr << "Unsupported unit_type" << std::endl;
+				exit(1);
+			}
+			path_loss_su_pr[j].push_back(pr_est_path_loss + zero);
 
 
-		if(y == 0) {
-			su_tp = this_su_tp + zero;
-		} else {
-			sInt min_su_tp = this_su_tp < su_tp;
-			su_tp = min_su_tp.ifelse(this_su_tp, su_tp);
+			if(y == 0 && x == 0) {
+				su_tp = this_su_tp + zero;
+			} else {
+				sInt min_su_tp = this_su_tp < su_tp;
+				su_tp = min_su_tp.ifelse(this_su_tp, su_tp);
+			}
 		}
 	}
 
 	// |-------------------------------|
 	// |  Reveal transmit power of SU  |
 	// |-------------------------------|
-	sInt su_tp_a = INPUT(parties, 0, splitRandVal(), bit_count);
+	sInt su_tp_a = INPUT(parties, 0, splitRandVal(), sm_params->bit_count);
 	sInt su_tp_b = su_tp - su_tp_a;
 
 	// reveal this output to party 0.
 	parties[0].reveal(su_tp_a);
 	parties[1].reveal(su_tp_b);
 
+	int max_su_tp_int;
 	float max_su_tp;
+
 	if (parties[0].isLocalParty()) {
-		max_su_tp = float(su_tp_a.getValue()) / factor;
+		max_su_tp_int = su_tp_a.getValue();
 	} else if(parties[1].isLocalParty()) {
-		 max_su_tp = float(su_tp_b.getValue()) / factor;;
+		max_su_tp_int = su_tp_b.getValue();
 	}
+	max_su_tp = float(max_su_tp_int) / sm_params->factor;
+
+	// Send data to SU, and get back actual transmit power
+	su_ch->send(std::array<int, 3>{su.index, max_su_tp_int, int(sm_params->factor)});
+
+	std::array<int, 2> su_vals;
+	su_ch->recv(su_vals);
+
+	int actual_su_tp_pt = su_vals[0];
+	int is_su_transmitting = su_vals[1];
 
 	// |------------------------|
 	// |  Update PR thresholds  |
 	// |------------------------|
-	// TODO Send these values to the SU, and get the actual transmit power
-	int actual_su_tp_pt = 0;
-
-	sInt actual_su_tp_a = INPUT(parties, 0, int(actual_su_tp_pt * factor), bit_count);
-	sInt actual_su_tp_b = INPUT(parties, 1, int(actual_su_tp_pt * factor), bit_count);
+	sInt actual_su_tp_a = INPUT(parties, 0, int(actual_su_tp_pt * sm_params->factor), sm_params->bit_count);
+	sInt actual_su_tp_b = INPUT(parties, 1, int(actual_su_tp_pt * sm_params->factor), sm_params->bit_count);
 	sInt actual_su_tp = actual_su_tp_a + actual_su_tp_b;
 
-	sInt tmp_diff = INPUT(parties, 0, int(-5.0 * factor), bit_count);
+	// is_su_transmitting
+	sInt is_su_transmitting_a = INPUT(parties, 0, is_su_transmitting, sm_params->bit_count);
+	sInt is_su_transmitting_b = INPUT(parties, 1, is_su_transmitting, sm_params->bit_count);
+	sInt is_su_transmitting_sec = (is_su_transmitting_a + is_su_transmitting_b) > zero;
 
 	// Calculate updates
 	// updates[i].first is the index of the PU to update, and updates[i].second is the list of updates to the PR threshholds to update.
@@ -986,11 +1253,11 @@ float SpectrumManager::secureRadar(
 		int num_prs = 1;
 		for(int x = 0; x < num_prs; ++x) {
 			// Calculate the update to the PR thresh: u = 10 * log_10(1.0 - 10 ^ ((rp - thresh) / 10))
-			sInt diff_dbm = tmp_diff + zero;
+			sInt diff_dbm = actual_su_tp + path_loss_su_pr[j][x];
 			sInt diff_div_ten = diff_dbm / ten;
 
 			sInt ten_to_diff;
-			utils::securePow10(&ten_to_diff, diff_div_ten, parties, bit_count, factor, factor_int);
+			utils::securePow10(&ten_to_diff, diff_div_ten, parties, sm_params->bit_count, sm_params->factor, factor_int);
 
 			ten_to_diff = factor_int - ten_to_diff;
 
@@ -999,9 +1266,14 @@ float SpectrumManager::secureRadar(
 
 			sInt update = ten * log_diff;
 
-			// TODO If diff is beyond some constant, make update zero
+			// If SU isn't actually transmitting, make the update 0.
+			update = is_su_transmitting_sec.ifelse(update, zero);
 
-			updates[y].second.push_back(update + zero);
+			if(sm_params->no_pr_thresh_update) {
+				updates[y].second.push_back(zero + zero);
+			} else {
+				updates[y].second.push_back(update + zero);
+			}
 		}
 	}
 	secureTableWrite(parties, pu_table, updates, sm_ch);
@@ -1063,13 +1335,13 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 	int num_pu = pu_table->pus.size();
 	int num_pr_per_pu = pu_table->num_pr_per_pu;
 
-	if(secure_write_algo == SpectrumManager::SecureWriteAlgo::PROPOSED){
+	if(sm_params->secure_write_algo == SMParams::SecureWriteAlgo::PROPOSED){
 		// TODO secure Table write.
 		// Each side randomly shifts the "threshold table"
 		int shift = rand() % pu_table->pus.size();
 	
-		sInt shift_a = INPUT(parties, 0, shift, bit_count);
-		sInt shift_b = INPUT(parties, 1, shift, bit_count);
+		sInt shift_a = INPUT(parties, 0, shift, sm_params->bit_count);
+		sInt shift_b = INPUT(parties, 1, shift, sm_params->bit_count);
 	
 		// Using S2-PC, get the coordinate to get the apprpriate values
 		std::vector<std::pair<int, std::vector<int> > > this_updates;
@@ -1090,8 +1362,7 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 			this_updates.push_back(std::make_pair(this_shifted_index, std::vector<int>()));
 	
 			for(unsigned int j = 0; j < updates[i].second.size(); ++j) {
-	
-				sInt this_update_a = INPUT(parties, 0, rand() % 100 - 50, bit_count);
+				sInt this_update_a = INPUT(parties, 0, rand() % 100 - 50, sm_params->bit_count);
 				sInt this_update_b = updates[i].second[j] - this_update_a;
 	
 				parties[0].reveal(this_update_a);
@@ -1179,16 +1450,16 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 			}
 		}
 		// TODO check that the update is actually applied
-	} else if(secure_write_algo == SpectrumManager::SecureWriteAlgo::SPC) {
+	} else if(sm_params->secure_write_algo == SMParams::SecureWriteAlgo::SPC) {
 		// TODO
 		for(int i = 0; i < num_pu; ++i) {
 			std::vector<sInt> this_updates;
 
 			for(int j = 0; j < num_pr_per_pu; ++j) {
-				this_updates.push_back(INPUT(parties, 0, 0, bit_count));
+				this_updates.push_back(INPUT(parties, 0, 0, sm_params->bit_count));
 			}
 
-			sInt this_index = INPUT(parties, 0, i, bit_count);
+			sInt this_index = INPUT(parties, 0, i, sm_params->bit_count);
 			for(unsigned int j = 0; j < updates.size(); ++j) {
 				sInt eq_index = (this_index >= updates[j].first) & (this_index <= updates[j].first);
 				for(unsigned int y = 0; y < this_updates.size(); ++y) {
@@ -1197,7 +1468,7 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 			}
 
 			for(unsigned int j = 0; j < this_updates.size(); ++j) {
-				sInt u_a = INPUT(parties, 0, rand() % 100 - 50, bit_count);
+				sInt u_a = INPUT(parties, 0, rand() % 100 - 50, sm_params->bit_count);
 				sInt u_b = this_updates[j] - u_a;
 
 				parties[0].reveal(u_a);
@@ -1221,10 +1492,180 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 	}
 }
 
-std::vector<float> SpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table) const {
-	std::map<int, std::vector<const PU*> > pu_groups;
+void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table) {
+	// SU
+	sm_ch->send(su.getValues());
+
+	// Grid Table - SS
+	sm_ch->send(std::array<int, 1>{int(grid_table.sss.size())});
+
+	// Assume grid_table.sss keys go from 1 to n
+	for(unsigned int i = 0; i < grid_table.sss.size(); ++i) {
+		auto ss_itr = grid_table.sss.find(i);
+		if(ss_itr == grid_table.sss.end()) {
+			std::cerr << "Error in SS table" << std::endl;
+			exit(1);
+		}
+
+		sm_ch->send(std::array<int, 1>{int(ss_itr->second.size())});
+
+		for(unsigned int j = 0; j < ss_itr->second.size(); ++j) {
+			sm_ch->send(ss_itr->second[j].getValues());
+		}
+	}
+
+	// Grid Table - PU
+	sm_ch->send(std::array<int, 1>{int(grid_table.pu_refs.size())});
+
+	// Assume grid_table.pu_ref keys go from 1 to n
+	for(unsigned int i = 0; i < grid_table.pu_refs.size(); ++i) {
+		auto pu_ref_itr = grid_table.pu_refs.find(i);
+		if(pu_ref_itr == grid_table.pu_refs.end()) {
+			std::cerr << "Error in PU_REF table" << std::endl;
+			exit(1);
+		}
+
+		sm_ch->send(pu_ref_itr->second);
+	}
+
+	// PU Table
+	sm_ch->send(std::array<int, 2>{int(pu_table.pus.size()), pu_table.num_pr_per_pu});
+
+	for(unsigned int i = 0; i < pu_table.pus.size(); ++i) {
+		auto pu_itr = pu_table.pus.find(i);
+		if(pu_itr == pu_table.pus.end()) {
+			std::cerr << "Error in PU table" << std::endl;
+			exit(1);
+		}
+
+		sm_ch->send(pu_itr->second.getValues());
+
+		if(int(pu_itr->second.prs.size()) != pu_table.num_pr_per_pu) {
+			std::cerr << "Invalid num pr: " <<  pu_itr->second.prs.size() << ", " << pu_table.num_pr_per_pu << std::endl;
+			exit(1);
+		}
+
+		for(unsigned int j = 0; j < pu_itr->second.prs.size(); ++j) {
+			sm_ch->send(pu_itr->second.prs[j].getValues());
+		}
+	}
+}
+
+void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table) {
+	std::vector<int> vals;
+
+	// SU
+	sm_ch->recv(vals);
+	su->setValues(vals);
+
+	// Grid Table - SS
+	std::array<int, 1> gt_ss_c;
+	sm_ch->recv(gt_ss_c);
+	int gt_ss_entries = gt_ss_c[0];
+
+	for(int i = 0; i < gt_ss_entries; ++i) {
+		std::array<int, 1> gt_ss_entry_c;
+		sm_ch->recv(gt_ss_entry_c);
+		int gt_ss_entry_size = gt_ss_entry_c[0];
+
+		std::vector<SSint> this_entry(gt_ss_entry_size);
+		for(int j = 0; j < gt_ss_entry_size; ++j) {
+			vals.clear();
+			sm_ch->recv(vals);
+			this_entry[j].setValues(vals);
+		}
+
+		grid_table->sss[i] = this_entry;
+	}
+
+	// Grid Table - PU
+	std::array<int, 1> gt_pu_ref_c;
+	sm_ch->recv(gt_pu_ref_c);
+	int gt_pu_ref_entries = gt_pu_ref_c[0];
+
+	for(int i = 0; i < gt_pu_ref_entries; ++i) {
+		vals.clear();
+		sm_ch->recv(vals);
+
+		grid_table->pu_refs[i] = vals;
+	}
+
+	// PU Table
+	std::array<int, 2> put_c;
+	sm_ch->recv(put_c);
+	int put_entries = put_c[0];
+	int put_npr = put_c[1];
+
+	pu_table->num_pr_per_pu = put_npr;
+
+	for(int i = 0; i < put_entries; ++i) {
+		vals.clear();
+		sm_ch->recv(vals);
+		pu_table->pus[i].setValues(vals);
+
+		std::vector<PRint> this_prs(put_npr);
+		for(int j = 0; j < put_npr; ++j) {
+			vals.clear();
+			sm_ch->recv(vals);
+			this_prs[j].setValues(vals);
+		}
+		pu_table->pus[i].prs = this_prs;
+	}
+
+	// Decrypt Data
+	// SU
+	key_server->decrypt(su);
+
+	// SS
+	for(auto ss_itr = grid_table->sss.begin(); ss_itr != grid_table->sss.end(); ++ss_itr) {
+		for(unsigned int i = 0; i < ss_itr->second.size(); ++i) {
+			key_server->decrypt(&(ss_itr->second[i]));
+		}
+	}
+
+	// PU
+	for(auto pu_itr = pu_table->pus.begin(); pu_itr != pu_table->pus.end(); ++pu_itr) {
+		key_server->decrypt(&(pu_itr->second));
+
+		// PR
+		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
+			key_server->decrypt(&(pu_itr->second.prs[i]));
+		}
+	}
+}
+
+void SpectrumManager::sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table) {
+	for(auto pu_itr = pu_table.pus.begin(); pu_itr != pu_table.pus.end(); ++pu_itr) {
+		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
+			// Encrypt just the PR thresholds
+			int v = key_server->encryptPRThreshold(pu_itr->second.prs[i]);
+
+			// Send the encrypted threshold back to the SM
+			std::array<int, 1> thresh_val{v};
+			sm_ch->send(thresh_val);
+		}
+	}
+}
+
+void SpectrumManager::recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table) {
+	for(auto pu_itr = pu_table->pus.begin(); pu_itr != pu_table->pus.end(); ++pu_itr) {
+		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
+			// Recv the new PR threshold
+			std::array<int, 1> thresh_val;
+			sm_ch->recv(thresh_val);
+
+			// Update the pu_table
+			pu_itr->second.prs[i].threshold = thresh_val[0];
+		}
+	}
+}
+
+std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table) const {
+	std::vector<PU> pus = input_pus;
+
+	std::map<int, std::vector<PU*> > pu_groups;
 	std::map<int, std::vector<const SS*> > ss_groups;
-	if(use_grid) {
+	if(sm_params->use_grid) {
 		std::map<int, std::vector<int> > pu_int_groups;
 		std::map<int, std::vector<int> > ss_int_groups;
 		plainTextGrid(pus, sss, &pu_int_groups, &ss_int_groups);
@@ -1242,9 +1683,9 @@ std::vector<float> SpectrumManager::plainTextRun(const std::vector<SU>& sus, con
 		}
 	}
 
-	std::vector<const PU*> sel_pus;
+	std::vector<PU*> sel_pus;
 	std::vector<const SS*> sel_sss;
-	if(!use_grid) {
+	if(!sm_params->use_grid) {
 		for(unsigned int j = 0; j < pus.size(); ++j) {
 			sel_pus.push_back(&pus[j]);
 		}
@@ -1255,11 +1696,11 @@ std::vector<float> SpectrumManager::plainTextRun(const std::vector<SU>& sus, con
 	}
 	std::vector<float> all_vals;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		if(use_grid) {
+		if(sm_params->use_grid) {
 			sel_pus.clear();
 			sel_sss.clear();
 
-			int group_id = int(sus[i].loc.x / grid_delta_x) + int(sus[i].loc.y / grid_delta_y) * grid_num_x;
+			int group_id = int(sus[i].loc.x / sm_params->grid_delta_x) + int(sus[i].loc.y / sm_params->grid_delta_y) * sm_params->grid_num_x;
 
 			auto pu_itr = pu_groups.find(group_id);
 			if(pu_itr == pu_groups.end()) {
@@ -1284,7 +1725,7 @@ std::vector<float> SpectrumManager::plainTextRun(const std::vector<SU>& sus, con
 	return all_vals;
 }
 
-void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,
+void PlaintextSpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,
 		std::map<int, std::vector<int> >* pu_int_groups, std::map<int, std::vector<int> >* ss_int_groups) const {
 	struct comp {
 		bool operator()(const std::pair<float, int>& v1, const std::pair<float, int>& v2) const {
@@ -1293,15 +1734,15 @@ void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vecto
 	};
 
 	// PU Groups
-	for(int x = 0; x < grid_num_x; ++x) {
-		for(int y = 0; y < grid_num_y; ++y) {
+	for(int x = 0; x < sm_params->grid_num_x; ++x) {
+		for(int y = 0; y < sm_params->grid_num_y; ++y) {
 			std::vector<std::pair<float, int> > pu_vals;
 
 			for(unsigned int i = 0; i < pus.size(); ++i) {
-				float this_dist = pus[i].loc.dist(Location((x + 0.5) * grid_delta_x, (y + 0.5) * grid_delta_y));
+				float this_dist = pus[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
 
-				if((int) pu_vals.size() < grid_min_num_pu || this_dist < pu_vals.front().first) {
-					if((int) pu_vals.size() >= grid_min_num_pu) {
+				if((int) pu_vals.size() < sm_params->grid_min_num_pu || this_dist < pu_vals.front().first) {
+					if((int) pu_vals.size() >= sm_params->grid_min_num_pu) {
 						std::pop_heap(pu_vals.begin(), pu_vals.end(), comp());
 						pu_vals.pop_back();
 					}
@@ -1311,7 +1752,7 @@ void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vecto
 				}
 			}
 
-			int group_id = x + y * grid_num_x;
+			int group_id = x + y * sm_params->grid_num_x;
 			for(unsigned int i = 0; i < pu_vals.size(); ++i) {
 				(*pu_int_groups)[group_id].push_back(pu_vals[i].second);
 			}
@@ -1319,15 +1760,15 @@ void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vecto
 	}
 
 	// SS Groups
-	for(int x = 0; x < grid_num_x; ++x) {
-		for(int y = 0; y < grid_num_y; ++y) {
+	for(int x = 0; x < sm_params->grid_num_x; ++x) {
+		for(int y = 0; y < sm_params->grid_num_y; ++y) {
 			std::vector<std::pair<float, int>> ss_vals;
 
 			for(unsigned int i = 0; i < sss.size(); ++i) {
-				float this_dist = sss[i].loc.dist(Location((x + 0.5) * grid_delta_x, (y + 0.5) * grid_delta_y));
+				float this_dist = sss[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
 
-				if((int) ss_vals.size() < grid_min_num_ss || this_dist < ss_vals.front().first) {
-					if((int) ss_vals.size() >= grid_min_num_ss) {
+				if((int) ss_vals.size() < sm_params->grid_min_num_ss || this_dist < ss_vals.front().first) {
+					if((int) ss_vals.size() >= sm_params->grid_min_num_ss) {
 						std::pop_heap(ss_vals.begin(), ss_vals.end(), comp());
 						ss_vals.pop_back();
 					}
@@ -1337,7 +1778,7 @@ void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vecto
 				}
 			}
 
-			int group_id = x + y * grid_num_x;
+			int group_id = x + y * sm_params->grid_num_x;
 			for(unsigned int i = 0; i < ss_vals.size(); ++i) {
 				(*ss_int_groups)[group_id].push_back(ss_vals[i].second);
 			}
@@ -1345,17 +1786,17 @@ void SpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vecto
 	}
 }
 
-float SpectrumManager::plainTextRadar(
-		const SU& su, const std::vector<const PU*>& pus, const std::vector<const SS*>& sss, PathLossTable* path_loss_table) const {
+float PlaintextSpectrumManager::plainTextRadar(
+		const SU& su, std::vector<PU*>& pus, const std::vector<const SS*>& sss, PathLossTable* path_loss_table) const {
 	// PU selection.
 	std::vector<int> pu_inds;
-	unsigned int k_pu = numSelect(this->num_pu_selection, pus.size());
+	unsigned int k_pu = numSelect(sm_params->num_pu_selection, pus.size());
 
 	// SS selection.
 	std::vector<int> sss_inds;
 	std::vector<float> sss_dists;
-	unsigned int k_ss = numSelect(this->num_ss_selection, sss.size());
-	if(selection_algo == SpectrumManager::SelectionAlgo::NONE) {
+	unsigned int k_ss = numSelect(sm_params->num_ss_selection, sss.size());
+	if(sm_params->selection_algo == SMParams::SelectionAlgo::NONE) {
 		for(unsigned int i = 0; i < k_pu; ++i) {
 			pu_inds.push_back(i);
 		}
@@ -1364,7 +1805,7 @@ float SpectrumManager::plainTextRadar(
 			sss_inds.push_back(i);
 			sss_dists.push_back(su.loc.dist(sss[i]->loc));
 		}
-	} else if(selection_algo == SpectrumManager::SelectionAlgo::SORT) {
+	} else if(sm_params->selection_algo == SMParams::SelectionAlgo::SORT) {
 		std::vector<float> pu_dists;
 		for(unsigned int i = 0; i < pus.size(); ++i) {
 			float dist = su.loc.dist(pus[i]->loc);
@@ -1409,7 +1850,7 @@ float SpectrumManager::plainTextRadar(
 				}
 			}
 		}
-	} else if(selection_algo == SpectrumManager::SelectionAlgo::RANDOM) {
+	} else if(sm_params->selection_algo == SMParams::SelectionAlgo::RANDOM) {
 		std::vector<int> all_pu_inds;
 		for(unsigned int i = 0; i < pus.size(); ++i) {
 			all_pu_inds.push_back(i);
@@ -1445,12 +1886,11 @@ float SpectrumManager::plainTextRadar(
 			d = 0.0001; 
 		}
 
-		float w = 1.0 / pow(d, pl_alpha);
+		float w = 1.0 / pow(d, sm_params->pl_alpha);
 		weights.push_back(w);
 		tmp_sum_weight += w;
 	}
 
-	float transmit_power = std::numeric_limits<float>::infinity();
 	// Compute the share of received power for each
 	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
 	std::vector<std::vector<float> > received_powers;
@@ -1458,7 +1898,7 @@ float SpectrumManager::plainTextRadar(
 		std::vector<float> rp_weights;
 		float sum_rp_weights = 0.0;
 		for(unsigned int j = 0; j < pus.size(); ++j) {
-			rp_weights.push_back(1.0 / pow(sss[i]->loc.dist(pus[j]->loc), rp_alpha));
+			rp_weights.push_back(1.0 / pow(sss[i]->loc.dist(pus[j]->loc), sm_params->rp_alpha));
 			sum_rp_weights += rp_weights[j];
 		}
 
@@ -1478,6 +1918,8 @@ float SpectrumManager::plainTextRadar(
 	
 	// Compute SU transmit power
 	// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
+	float max_transmit_power = std::numeric_limits<float>::infinity();
+	std::vector<std::vector<float> > estimated_path_loss; // estimated_path_loss[i][j] is the path loss between the su and PU i's PR j.
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
 		unsigned int j = pu_inds[y];
 		float sum_weight = 0.0;
@@ -1492,28 +1934,62 @@ float SpectrumManager::plainTextRadar(
 			}
 		}
 		
-		float this_path_loss = sum_weighted_ratio / sum_weight;
-		path_loss_table->addPlaintextPathLoss(su.index, j, 0, this_path_loss);
+		float this_pu_path_loss = sum_weighted_ratio / sum_weight;
 
-		float this_transmit_power;
-		if(utils::unit_type == utils::UnitType::ABS) {
-			this_transmit_power = pus[j]->prs[0].threshold * sum_weight / sum_weighted_ratio;
-		} else if(utils::unit_type == utils::UnitType::DB) {
-			this_transmit_power = pus[j]->prs[0].threshold - sum_weighted_ratio / sum_weight;
-		} else {
-			std::cerr << "Unsupported unit_type" << std::endl;
-			exit(1);
-		}
+		estimated_path_loss.push_back(std::vector<float>());
+		for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
+			float this_pr_path_loss = this_pu_path_loss + 10.0 * sm_params->pl_est_gamma * log10(su.loc.dist(pus[j]->prs[x].loc) / su.loc.dist(pus[j]->loc));
 
-		if(this_transmit_power < transmit_power) {
-			transmit_power = this_transmit_power;
+			path_loss_table->addPlaintextPathLoss(su.index, j, x, this_pr_path_loss);
+			estimated_path_loss[y].push_back(this_pr_path_loss);
+			
+			float this_transmit_power;
+			if(utils::unit_type == utils::UnitType::ABS) {
+				std::cerr << "Not implemented yet" << std::endl;
+				exit(1);
+
+				this_transmit_power = pus[j]->prs[0].threshold / this_pr_path_loss;
+			} else if(utils::unit_type == utils::UnitType::DB) {
+
+
+				this_transmit_power = pus[j]->prs[0].threshold - this_pr_path_loss;
+			} else {
+				std::cerr << "Unsupported unit_type" << std::endl;
+				exit(1);
+			}
+
+			if(this_transmit_power < max_transmit_power) {
+				max_transmit_power = this_transmit_power;
+			}
 		}
 	}
 
-	return transmit_power;
+	if(!(sm_params->no_pr_thresh_update)) {
+		float actual_su_tp = max_transmit_power + su.less_max_tp;
+		bool is_su_transmitting = actual_su_tp > su.min_tp;
+
+		if(is_su_transmitting) {
+			for(unsigned int y = 0; y < pu_inds.size(); ++y) {
+				unsigned int j = pu_inds[y];
+				if(j != y) {
+					std::cerr << "False assumption made" << std::endl;
+					exit(1);
+				}
+				for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
+					float rp = actual_su_tp + estimated_path_loss[y][x];
+					
+					float new_value = utils::todBm(utils::fromdBm(pus[j]->prs[x].threshold) - utils::fromdBm(rp));
+					
+					pus[j]->prs[x].threshold = new_value;
+				}
+			}
+		}
+	}
+
+	return max_transmit_power;
 }
 
-void SpectrumManager::initGroupDeviations() {
+void SMParams::initGroupDeviations() {
 
 	std::map<float, std::vector<std::pair<int, int> > > deviations_by_dist_squared;
 	for(int xd = 0; xd <= grid_num_x; ++xd) {
@@ -1551,7 +2027,7 @@ void SpectrumManager::initGroupDeviations() {
 	}
 }
 
-const std::vector<std::pair<int, int> >& SpectrumManager::getDeviations(int iter) const {
+const std::vector<std::pair<int, int> >& SMParams::getDeviations(int iter) const {
 	if(iter < 0 || (unsigned int)iter >= all_deviations.size()) {
 		std::cerr << "Invalid iter: " << iter << std::endl;
 		exit(1);

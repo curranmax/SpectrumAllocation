@@ -40,6 +40,7 @@ class Args {
 
 	bool skip_s2pc;
 
+	std::string central_entities;
 
 	// Generation params
 	int num_pu;
@@ -79,6 +80,7 @@ class Args {
 	int num_pu_selection;
 
 	bool do_plaintext_split;
+	bool no_pr_thresh_update;
 	
 	std::string selection_algo;
 	std::string secure_write_algo;
@@ -95,6 +97,8 @@ class Args {
 
 	// Number of bits overall to use in S2-PC.
 	int s2_pc_bit_count;
+
+	float pl_est_gamma;
 };
 
 #endif

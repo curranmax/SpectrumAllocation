@@ -96,6 +96,9 @@ void Generator::generateEntities(
 			}
 
 			PR pr(pr_loc, threshold);
+			if(out_filename == "") {
+				pm->preprocessPathLoss(&pr, su_height, j, x);
+			}
 
 			pu.prs.push_back(pr);
 		}
@@ -140,6 +143,9 @@ void Generator::generateEntities(
 		Location su_loc(x, y, su_height);
 
 		SU su(i, Location(x, y, su_height));
+		su.index = i;
+		su.less_max_tp = utils::randomFloat(-2.5, -10.0);
+		su.min_tp = -100.0;
 		(*sus).push_back(su);
 	}
 
@@ -214,33 +220,52 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 	out.close();
 }
 
-std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, const std::vector<PU>& pus, PathLossTable* path_loss_table) const {
-	std::vector<std::vector<float> > path_losses;
+std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const {
+	std::vector<PU> pus = input_pus;
+
+	std::vector<std::vector<std::vector<float> > > path_losses; // path_losses[j][i][x] is the path loss between su i and PU j's PR x.
 
 	for(unsigned int j = 0; j < pus.size(); ++j) {
-		pm->loadANOFile(pus[j]);
-		path_losses.push_back(std::vector<float>());
+		path_losses.push_back(std::vector<std::vector<float>>());
 		for(unsigned int i = 0; i < sus.size(); ++i) {
-			float v = pm->getPathLoss(pus[j].loc, sus[i].loc);
-
-			path_losses[j].push_back(v);
+			path_losses[j].push_back(std::vector<float>());
+			for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+				path_losses[j][i].push_back(0.0);
+			}
 		}
 	}
 
+	// Precomputes all path losses between PRs and SUs
+	for(unsigned int j = 0; j < pus.size(); ++j) {	
+		if(pus[j].prs.size() == 1 && pus[j].loc.dist(pus[j].prs[0].loc)) {
+			pm->loadANOFile(pus[j]);
+			for(unsigned int i = 0; i < sus.size(); ++i) {
+				float v = pm->getPathLoss(pus[j].loc, sus[i].loc);
+				path_losses[j][i][0] = v;
+			}
+		} else {
+			for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+				pm->loadANOFile(pus[j].prs[x]);
+				
+				for(unsigned int i = 0; i < sus.size(); ++i) {
+					float v = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
+					path_losses[j][i][x] = v;
+				}
+			}
+		}
+	}
+
+	// Computes the maximum transmit powers of SUs
 	std::vector<float> tps;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		float tp = 0.0;
+		float max_tp = 0.0;
 		bool first = true;
 		for(unsigned int j = 0; j < pus.size(); ++j) {
 			for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
 				float this_tp = 0.0;
 
-				float this_pl = path_losses[j][i];
+				float this_pl = path_losses[j][i][x];
 				path_loss_table->addGroundTruthPathLoss(i, j, x, this_pl);
-				if(pus[j].loc.dist(pus[j].prs[x].loc) > 0.01) {
-					std::cerr << "Only supports RADAR system for now" << std::endl;
-					exit(1);
-				}
 				
 				if(utils::unit_type == utils::UnitType::ABS) {
 					this_tp = pus[j].prs[x].threshold / this_pl;
@@ -251,14 +276,26 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 					exit(1);
 				}
 				if(first) {
-					tp = this_tp;
+					max_tp = this_tp;
 					first = false;
-				} else if(this_tp < tp) {
-					tp = this_tp;
+				} else if(this_tp < max_tp) {
+					max_tp = this_tp;
 				}
 			}
 		}
-		tps.push_back(tp);
+		tps.push_back(max_tp);
+		if(!no_pr_thresh_update) {
+			float actual_tp = max_tp + sus[i].less_max_tp;
+			if(actual_tp > sus[i].min_tp) {
+				for(unsigned int j = 0; j < pus.size(); ++j) {
+					for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+						float rp = actual_tp + path_losses[j][i][x];
+						float new_value = utils::todBm(utils::fromdBm(pus[j].prs[x].threshold) - utils::fromdBm(rp));
+						pus[j].prs[x].threshold = new_value;
+					}
+				}
+			}
+		}
 	}
 	return tps;
 }
