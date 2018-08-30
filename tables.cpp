@@ -10,7 +10,9 @@
 
 void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, const std::map<int, std::vector<const PUint*> >& pu_groups,
 					GridTable* grid_table, PUTable* pu_table) {
-	// SS
+	
+	pu_table->num_pr_per_pu = -1;
+
 	for(auto ss_itr = ss_groups.begin(); ss_itr != ss_groups.end(); ++ss_itr) {
 		auto pu_itr = pu_groups.find(ss_itr->first);
 
@@ -33,6 +35,13 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 		}
 
 		for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
+			if(pu_table->num_pr_per_pu == -1) {
+				pu_table->num_pr_per_pu = pu_itr->second[j]->prs.size();
+			} else if(pu_table->num_pr_per_pu != int(pu_itr->second[j]->prs.size())) {
+				std::cerr << "Inconsistent number of PUs" << std::endl;
+				exit(1);
+			}
+
 			grid_table->pu_refs[pu_itr->first].push_back(pu_itr->second[j]->index);
 
 			if(pu_table->pus.count(pu_itr->second[j]->index) == 0) {

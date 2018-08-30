@@ -41,7 +41,7 @@ public:
 
 	void outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const;
 
-	std::vector<float> computeGroundTruth(const std::vector<SU>& su, const std::vector<PU>& pus, PathLossTable* path_loss_table) const;
+	std::vector<float> computeGroundTruth(const std::vector<SU>& su, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const;
 
 private:
 	float location_range;

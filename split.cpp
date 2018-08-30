@@ -73,6 +73,11 @@ std::pair<SSint, SSint> splitSpectrumSensorInt(const SS& ss, float factor) {
 std::pair<SUint, SUint> splitSecondaryUserInt(const SU& su, float factor) {
 	auto loc_split = splitLocInt(su.loc, factor);
 	
-	return std::make_pair(SUint(loc_split.first),
+	auto v = std::make_pair(SUint(loc_split.first),
 							SUint(loc_split.second));
+
+	v.first.index  = su.index;
+	v.second.index = su.index;
+
+	return v;
 }

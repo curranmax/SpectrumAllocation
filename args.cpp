@@ -38,6 +38,7 @@ Args::Args(const int &argc, char const *argv[]) {
 	args = {Arg_Val(&rand_seed, 0, "-rand_seed", "RAND_SEED", "Value to seed RNG with."),
 			Arg_Val(&brief_out, "-brief_out", "If given, only outputs minimal info."),
 			Arg_Val(&skip_s2pc, "-skip_s2pc", "If given, skips the secure algorithm and only runs the plaintext algo."),
+			Arg_Val(&central_entities, "two_sms", "-ces", "CENTRAL_ENTITIES", "The central entities that will run the secure algorithm. Must be 'two_sms', or 'sm_ks'"),
 			Arg_Val(&num_pu, 1, "-npu", "NUM_PU", "Number of Primary Users to generate."),
 			Arg_Val(&num_ss, 1, "-nss", "NUM_SS", "Number of Spectrum Sensors to generate."),
 			Arg_Val(&num_su, 1, "-nsu", "NUM_SU", "Number of Secondary Users to generate."),
@@ -60,6 +61,7 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&num_ss_selection, 0, "-nss_s", "NUM_SS_SELECTION", "For each SU request, uses only the specified number of nearby SS. A value of 0 uses all SS."),
 			Arg_Val(&num_pu_selection, 0, "-npu_s", "NUM_PU_SELECTION", "For each SU request, uses only the specified number of nearby PU. A value of 0 uses all SS."),
 			Arg_Val(&do_plaintext_split, "-do_pt_split", "If given, will do preprocessing split of SS receive power in plaintext."),
+			Arg_Val(&no_pr_thresh_update, "-no_pr_up", "If given, then pr thresholds aren't updated."),
 			Arg_Val(&selection_algo, "sort", "-sel_algo", "ALGO", "Selection Algo used for SS. Must be \"none\", \"sort\", or \"random\""),
 			Arg_Val(&secure_write_algo, "proposed", "-sec_write_algo", "ALGO", "ALgorithm for secure write. Must be either \"proposed\" or \"spc\""),
 			Arg_Val(&grid_num_x, 0, "-grid_x", "NUM_X", "The number of times to divide the x dimension"),
@@ -67,7 +69,8 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&ss_receive_power_alpha, 1.0, "-rpa", "RECEIVE_POWER_ALPHA", "Parameter used when estimated the received power from PUs at SSs"),
 			Arg_Val(&path_loss_alpha, 1.0, "-pla", "PATH_LOSS_ALPHA", "Parameter used when estimating the path loss between PRs and SUs."),
 			Arg_Val(&num_float_bits, 16, "-float_bits", "NUM_FLOAT_BITS", "Number of bits of precision to use during the S2-PC calculations."),
-			Arg_Val(&s2_pc_bit_count, 64, "-bit_count", "BIT_COUNT", "Number of total bits to use in S2-PC calculations.")
+			Arg_Val(&s2_pc_bit_count, 64, "-bit_count", "BIT_COUNT", "Number of total bits to use in S2-PC calculations."),
+			Arg_Val(&pl_est_gamma, 1.0, "-plg", "PATH_LOSS_GAMMA", "Gmma used in path loss estimation.")
 	};
 
 	bool err = false;

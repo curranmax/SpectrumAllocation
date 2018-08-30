@@ -19,6 +19,9 @@ utils::UnitType utils::unit_type = utils::UnitType::ABS;
 
 void utils::setUnitType(const std::string& unit_type_str) {
 	if(unit_type_str == "abs" || unit_type_str == "ABS") {
+		std::cerr << "ABS unit_type is not fully implemented" << std::endl;
+		exit(1);
+
 		utils::unit_type = UnitType::ABS;
 	} else if(unit_type_str == "db" || unit_type_str == "dB" || unit_type_str == "DB") {
 		utils::unit_type = UnitType::DB;
@@ -59,21 +62,38 @@ void utils::secureLog10(
 		int num_iters) {
 	*ans = zero + zero;
 
-	sInt num   = v - factor_int;
-	sInt denom = factor_int + zero;
-	sInt sign  = factor_int + zero;
+	sInt one = factor_int / factor_int;
+
+	sInt ratio = factor_int * (v - factor_int) / (v + factor_int);
+	sInt ratio_sq = ratio * ratio / factor_int;
+
+	sInt k = ratio + zero;
+	sInt d = one + zero;
 
 	for(int i = 0; i < num_iters; ++i) {
-		*ans = (*ans) + sign * num / denom;
+		*ans = (*ans) + k / d;
 
 		if(i < num_iters - 1) {
-			num   = num * (v - factor_int) / factor_int;
-			denom = denom + factor_int;
-			sign  = zero - sign;
+			k = k * ratio_sq / factor_int;
+			d = d + one + one;
 		}
 	}
 
-	*ans = factor_int * (*ans) / ln_10;
+	// sInt num   = v - factor_int;
+	// sInt denom = factor_int + zero;
+	// sInt sign  = factor_int + zero;
+
+	// for(int i = 0; i < num_iters; ++i) {
+	// 	*ans = (*ans) + sign * num / denom;
+
+	// 	if(i < num_iters - 1) {
+	// 		num   = num * (v - factor_int) / factor_int;
+	// 		denom = denom + factor_int;
+	// 		sign  = zero - sign;
+	// 	}
+	// }
+
+	*ans = (factor_int + factor_int) * (*ans) / ln_10;
 }
 
 void utils::securePow10(

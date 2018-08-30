@@ -1,6 +1,7 @@
 
 #include "args.h"
 #include "generator.h"
+#include "key_server.h"
 #include "location.h"
 #include "path_loss_table.h"
 #include "primary_user.h"
@@ -8,6 +9,7 @@
 #include "spectrum_manager.h"
 #include "spectrum_sensor.h"
 #include "split.h"
+#include "su_server.h"
 #include "timer.h"
 #include "utils.h"
 
@@ -37,6 +39,7 @@ int main(int argc, char const *argv[]) {
 	
 	utils::setUnitType(args.unit_type);
 
+	// Set up ground truth propagation model
 	PropagationModel* pm;
 	if(args.propagation_model == "log_distance") {
 		pm = new LogDistancePM(args.ld_path_loss0, args.ld_dist0, args.ld_gamma);
@@ -52,6 +55,7 @@ int main(int argc, char const *argv[]) {
 		exit(0);
 	}
 
+	// Generate enetities
 	Generator gen(args.location_range, pm);
 
 	std::vector<PU> pus;
@@ -59,12 +63,14 @@ int main(int argc, char const *argv[]) {
 	std::vector<SU> sus;
 	gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus);
 	
+	// Set up Spectrum Manager params
 	float factor = 1 << args.num_float_bits;
-	SM sm(factor, args.num_ss_selection, args.num_pu_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.s2_pc_bit_count, args.brief_out);
-	sm.setSelectionAlgo(args.selection_algo);
+	SMParams sm_params(factor, args.s2_pc_bit_count, args.num_pu_selection, args.num_ss_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.brief_out);
+	sm_params.setSelectionAlgo(args.selection_algo);
 
-	Timer secure_write_timer;
-	sm.setSecureWriteAlgo(args.secure_write_algo, &secure_write_timer);
+	sm_params.setSecureWriteAlgo(args.secure_write_algo);
+	sm_params.no_pr_thresh_update = args.no_pr_thresh_update;
+	sm_params.pl_est_gamma = args.pl_est_gamma;
 
 	if(args.grid_num_x > 0 && args.grid_num_y > 0) {
 		int k_pu = args.num_pu_selection;
@@ -78,16 +84,17 @@ int main(int argc, char const *argv[]) {
 			k_ss = args.num_ss;
 		}
 
-		sm.setGridParams(
+		sm_params.setGridParams(
 				k_pu, k_ss,
 				args.grid_num_x, args.grid_num_y,
 				args.location_range / args.grid_num_x, args.location_range / args.grid_num_y);
 	}
 
+	PtSM pt_sm(&sm_params);
+
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
-	Timer t1;
-
+	Timer t1, secure_write_timer;
 	if(!args.skip_s2pc) {
 		// "Split values"
 		// PU
@@ -126,47 +133,96 @@ int main(int argc, char const *argv[]) {
 		if(args.do_plaintext_split) {
 			t1.start(Timer::plaintext_split_preprocessing);
 
-			sm.plainTextRadarPreprocess(pus_int0, pus_int1, &sss_int0, &sss_int1);
+			pt_sm.plainTextRadarPreprocess(pus_int0, pus_int1, &sss_int0, &sss_int1);
 
 			t1.end(Timer::plaintext_split_preprocessing);
 		}
 
 		std::map<int, std::vector<int> > precomputed_pu_int_groups;
 		std::map<int, std::vector<int> > precomputed_ss_int_groups;
-		if(sm.useGrid()) {
+		if(sm_params.use_grid) {
 			t1.start(Timer::plaintext_grid_preprocessing);
-			sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
+			pt_sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
 			t1.end(Timer::plaintext_grid_preprocessing);
+		}
+
+		KeyServer ks;
+		if(args.central_entities == "two_sms") {
+			// Do nothing
+		} else if(args.central_entities == "sm_ks") {
+			// Encrypt the '1's
+			for(unsigned int i = 0; i < pus_int1.size(); ++i) {
+				ks.encryptAndInit(&(pus_int1[i]));
+
+				for(unsigned int j = 0; j < pus_int1[i].prs.size(); ++j) {
+					ks.encryptAndInit(&(pus_int1[i].prs[j]));
+				}
+			}
+
+			for(unsigned int i = 0; i < sss_int1.size(); ++i) {
+				ks.encryptAndInit(&(sss_int1[i]));
+			}
+
+			for(unsigned int i = 0; i < sus_int1.size(); ++i) {
+				ks.encryptAndInit(&(sus_int1[i]));
+			}
+		} else {
+			std::cerr << "Unknown central_entities: " << args.central_entities << std::endl;
+			exit(1);
 		}
 
 		NullTimer null_timer;
 
 		// Used for communication between the two SMs.
-		int num_io_threads = 2;
+		int num_io_threads = 1;
 		const std::string server_addr = "127.0.0.1:1212";
 		const std::string connection_name = "sm_connection";
 		const std::string channel_name = "sm-to-sm_channel";
-		sm.setCommunicationValues(num_io_threads, server_addr, connection_name, channel_name);
+		sm_params.setCommunicationValues(num_io_threads, server_addr, connection_name, channel_name);
 
 		std::thread thrd0([&]() {
-			int party_id = 0; 
-			secure_vs_a = sm.run(party_id, pus_int0, sss_int0, sus_int0, precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
+			int party_id = 0;
+			if(args.central_entities == "two_sms") {
+				SM sm(party_id, &sm_params, pus_int0, sss_int0, sus_int0);
+				sm.setSecureWriteTimer(&secure_write_timer);
+	
+				secure_vs_a = sm.run(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
+			} else if(args.central_entities == "sm_ks") {
+				SM sm(party_id, &sm_params, pus_int0, sss_int0, sus_int0, pus_int1, sss_int1, sus_int1);
+				sm.setSecureWriteTimer(&secure_write_timer);
+				
+				secure_vs_a = sm.runSM(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
+			}
 		});
 
 		std::thread thrd1([&]() {
-			int party_id = 1; 
-			secure_vs_b = sm.run(party_id, pus_int1, sss_int1, sus_int1, precomputed_pu_int_groups, precomputed_ss_int_groups, &null_timer);
+			int party_id = 1;
+			if(args.central_entities == "two_sms") {
+				SM sm(party_id, &sm_params, pus_int1, sss_int1, sus_int1);
+	
+				secure_vs_b = sm.run(precomputed_pu_int_groups, precomputed_ss_int_groups, &null_timer);
+			} else if(args.central_entities == "sm_ks") {
+				SM sm(party_id, &sm_params, &ks); // Probably size information
+
+				secure_vs_b = sm.runKS(int(sus_int1.size()));
+			}
+		});
+
+		std::thread su_thrd([&]() {
+			SUServer su_server(sus);
+			su_server.run();
 		});
 
 		thrd0.join();
 		thrd1.join();
+		su_thrd.join();
 	}
 
 	PathLossTable path_loss_table;
 
-	std::vector<float> plaintext_vs = sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table);
-	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table);
-	
+	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table);
+	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table, args.no_pr_thresh_update);
+
 	std::vector<float> secure_vs;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		if(!args.skip_s2pc) {
@@ -214,7 +270,6 @@ int main(int argc, char const *argv[]) {
 			std::cout << "secure_write_time|float|" << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
 		}
 	} else {
-		std::cout << path_loss_table.table.size() << std::endl;
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
 			std::cout << "--------------------" << std::endl;
 			if(!args.skip_s2pc) {
