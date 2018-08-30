@@ -290,7 +290,7 @@ def readInParamResult(filenames):
 	return rv
 
 def runExperiment(param, no_run = False):
-	args = ['../s2pc', '-brief_out']
+	args = ['../s2pc_stable', '-brief_out']
 
 	var_flag_names = {
 			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
@@ -329,6 +329,9 @@ def runExperiment(param, no_run = False):
 	else:
 		rv = None
 		for i in range(5):
+			if args[0] != '../s2pc':
+				print bcolors.WARNING + bcolors.UNDERLINE + 'Not running the most up to date version of code' + bcolors.ENDC
+
 			process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 			process.wait()
 
