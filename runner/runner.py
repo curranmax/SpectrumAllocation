@@ -521,6 +521,9 @@ if __name__ == '__main__':
 
 			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
 
+			for i in enumerate(len(changes)):
+				changes[i]['central_entities'] = ['two_sms']
+
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
 							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
@@ -590,6 +593,8 @@ if __name__ == '__main__':
 				result = runExperiment(param, no_run = args.no_run)
 				if result != None:
 					out_values.append((param, result))
+				else:
+					print bcolors.BOLD + bcolors.FAIL + 'Experiment failed to finish' + bcolors.ENDC
 				end = datetime.now()
 				durs.append(end - start)
 
@@ -606,6 +611,7 @@ if __name__ == '__main__':
 					print 'Expected end at', bcolors.BOLD + bcolors.OKGREEN + expected_end_str + bcolors.ENDC
 				exp_num += 1
 
+	end = datetime.now()
 	print 'All Experiments took', bcolors.BOLD + bcolors.WARNING + str(end - begin_time) + bcolors.ENDC
 
 	if len(out_values) > 0:
