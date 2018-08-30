@@ -521,7 +521,7 @@ if __name__ == '__main__':
 
 			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
 
-			for i in enumerate(len(changes)):
+			for i in range(len(changes)):
 				changes[i]['central_entities'] = ['two_sms']
 
 		if experiment == PATH_LOSS_TEST:
