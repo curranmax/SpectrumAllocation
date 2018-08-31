@@ -525,7 +525,7 @@ if __name__ == '__main__':
 			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
 
 			for i in range(len(changes)):
-				changes[i]['central_entities'] = ['two_sms']
+				changes[i]['central_entities'] = ['sm_ks']
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
