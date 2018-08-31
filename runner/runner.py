@@ -12,8 +12,8 @@ TEST = 'test'
 
 VARY_NUM_SS_SELECT = 'vary_ss_select'
 
-TIMING_TEST_TWO_SMS = 'timing_test-two_sms'
-TIMING_TEST_SM_KS = 'timing_test-sm_ks'
+FULL_TEST_TWO_SMS = 'full_test-two_sms'
+FULL_TEST_SM_KS = 'full_test-sm_ks'
 PATH_LOSS_TEST = 'path_loss_test'
 
 MED_TEST = 'med_test'
@@ -24,7 +24,7 @@ OUTPUT_RUN = 'output'
 
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
-						TIMING_TEST_TWO_SMS, TIMING_TEST_SM_KS,
+						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						PATH_LOSS_TEST, MED_TEST, LARGE_TEST,
 						TEST_OUTPUT, OUTPUT_RUN]
 
@@ -496,14 +496,14 @@ if __name__ == '__main__':
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
-		if experiment in [TIMING_TEST_TWO_SMS, TIMING_TEST_SM_KS]:
+		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(1000, 1000)],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
-					'central_entities': (['two_sms'] if experiment == TIMING_TEST_TWO_SMS else ['sm_ks'])}
+					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks'])}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
