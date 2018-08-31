@@ -295,7 +295,7 @@ def readInParamResult(filenames):
 	return rv
 
 def runExperiment(param, no_run = False):
-	args = ['../s2pc_stable', '-brief_out']
+	args = ['../s2pc', '-brief_out']
 
 	var_flag_names = {
 			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
