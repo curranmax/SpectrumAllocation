@@ -54,6 +54,7 @@ class Args {
 	std::string unit_type; // Either "abs" or "db".
 
 	std::string out_filename;
+	std::string in_filename;
 
 	// Propagation Model
 	std::string propagation_model;

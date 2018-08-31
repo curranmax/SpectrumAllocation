@@ -47,6 +47,7 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&pr_range, 0.0, "-prr", "PR_RANGE", "Range to place PRs around PUs."),
 			Arg_Val(&unit_type, "abs", "-ut", "UNIT_TYPE", "Unit type to use for calculations. Must be either \"abs\" or \"db\""),
 			Arg_Val(&out_filename, "", "-out", "FILENAME", "File to write generated data to."),
+			Arg_Val(&in_filename, "", "-inf", "FILENAME", "File to read generated data from."),
 			Arg_Val(&propagation_model, "log_distance", "-pm", "PROPAGATION_MODEL", "Ground truth Propagation Model to use"),
 			Arg_Val(&ld_path_loss0, 1.0, "-ld_pl0", "REFERENCE_PATH_LOSS", "For Log-Distance PM, the reference path loss (in dBm)"),
 			Arg_Val(&ld_dist0, 5.0, "-ld_d0", "REFERENCE_DISTANCE", "For Log-Distance PM, the reference distance."),

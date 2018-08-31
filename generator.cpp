@@ -155,6 +155,240 @@ void Generator::generateEntities(
 	}
 }
 
+void Generator::getEntitiesFromFile(
+		int num_pu, int num_ss, int num_su, int num_pr_per_pu, const std::string& in_filename,
+		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) {
+	std::ifstream dstr(in_filename, std::ifstream::in);
+
+	std::vector<PU> all_pus;
+	std::vector<SS> all_sss;
+	std::vector<SU> all_sus;
+
+	// Store the path losses (in generator or in pm
+	std::map<std::pair<int, int>, float> pu_pls;
+	pr_pls.clear();
+
+	std::string token = "";
+	std::string line = "";
+	while(std::getline(dstr, line)) {
+		std::stringstream sstr(line);
+
+		sstr >> token;
+		// std::cout << token << std::endl;
+		
+		if(token == "PU") {
+			int id = -1;
+			float x = 0.0, y = 0.0, z = 0.0, tp = 0.0;
+			sstr >> id >> x >> y >> z >> tp;
+
+			if(id != int(all_pus.size())) {
+				std::cerr << "Invalid id for PU" << std::endl;
+				exit(1);
+			}
+
+			all_pus.push_back(PU(Location(x, y, z), tp));
+			all_pus[all_pus.size() - 1].pl_id = id;
+		} else if(token == "PR") {
+			int pu_id = -1, pr_id = -1;
+			float x = 0.0, y = 0.0, z = 0.0, thresh = 0.0;
+			sstr >> pu_id >> pr_id >> x >> y >> z >> thresh;
+
+			if(pu_id < 0 || pu_id >= int(all_pus.size())) {
+				std::cerr << "Invalid pu_id" << std::endl;
+				exit(1);
+			}
+
+			if(pr_id != int(all_pus[pu_id].prs.size())) {
+				std::cerr << "Invalid id for PR" << std::endl;
+			}
+
+			all_pus[pu_id].prs.push_back(PR(Location(x, y, z), thresh));
+			all_pus[pu_id].prs[all_pus[pu_id].prs.size() - 1].pl_id = pr_id;
+		} else if(token == "SS") {
+			int id = -1;
+			float x = 0.0, y = 0.0, z = 0.0;
+			sstr >> id >> x >> y >> z;
+
+			if(id != int(all_sss.size())) {
+				std::cerr << "Invalid id for SS" << std::endl;
+			}
+
+			all_sss.push_back(SS(Location(x, y, z), 0.0));
+			all_sss[all_sss.size() - 1].pl_id = id;
+		} else if(token == "SU") {
+			int id = -1;
+			float x = 0.0, y = 0.0, z = 0.0;
+			sstr >> id >> x >> y >> z;
+
+			if(id != int(all_sus.size())) {
+				std::cerr << "Invalid id for SU" << std::endl;
+			}
+
+			all_sus.push_back(SU(-1, Location(x, y, z)));
+			all_sus[all_sus.size() - 1].pl_id = id;
+		} else if(token == "PU_PL") {
+			int pu_id = -1, ss_id = -1;
+			float pl = 0.0;
+			sstr >> pu_id >> ss_id >> pl;
+
+			if(pu_id < 0 || pu_id >= int(all_pus.size())) {
+				std::cerr << "Invalid pu_id in PU_PL" << std::endl;
+				exit(1);
+			}
+
+			if(ss_id < 0 || ss_id >= int(all_sss.size())) {
+				std::cerr << "Invalid ss_id in PU_PL" << std::endl;
+				exit(1);
+			}
+
+			auto v = std::make_pair(pu_id, ss_id);
+			if(pu_pls.count(v) != 0) {
+				std::cerr << "Repeat PU_PL" << std::endl;
+				exit(1);
+			}
+
+			pu_pls[v] = pl;
+		} else if(token == "PR_PL") {
+			int pu_id = -1, pr_id = -1, su_id = -1;
+			float pl = 0.0;
+			sstr >> pu_id >> pr_id >> su_id >> pl;
+
+			if(pu_id < 0 || pu_id >= int(all_pus.size())) {
+				std::cerr << "Invalid pu_id in PR_PL" << std::endl;
+				exit(1);
+			}
+
+			if(pr_id < 0 || pr_id >= int(all_pus[pu_id].prs.size())) {
+				std::cerr << "Invalid pr_id in PR_PL" << std::endl;
+				exit(1);
+			}
+
+			if(su_id < 0 || su_id >= int(all_sus.size())) {
+				std::cerr << "Invalid su_id in PR_PL" << std::endl;
+				exit(1);
+			}
+
+			auto v = std::make_pair(std::make_pair(pu_id, pr_id), su_id);
+			if(pr_pls.count(v) != 0) {
+				std::cerr << "Repeat PR_PL" << std::endl;
+				exit(1);
+			}
+
+			pr_pls[v] = pl;
+		} else {
+			std::cerr << "Unexpected token: " << token << std::endl;
+			exit(1);
+		}
+	}
+	std::cout << all_pus.size() << " " << all_sss.size() << " " << all_sus.size() << std::endl;
+	std::cout << pu_pls.size() << " " << pr_pls.size() << std::endl;
+
+	// Randomly choose a subset of the values.
+	// PU
+	std::cout << "PU" << std::endl;
+	if(int(all_pus.size()) > num_pu) {
+		std::cout << "A" << std::endl;
+		std::shuffle(all_pus.begin(), all_pus.end(), std::default_random_engine(time(nullptr)));
+		for(int i = 0; i < num_pu; ++i) {
+			std::cout << i << std::endl;
+			pus->push_back(all_pus[i]);
+			std::cout << i << " " << all_pus[i].prs.size() << std::endl;
+
+			if(int(all_pus[i].prs.size()) > num_pr_per_pu) {
+				std::cout << "x" << std::endl;
+				std::shuffle(all_pus[i].prs.begin(), all_pus[i].prs.end(), std::default_random_engine(time(nullptr)));
+				std::cout << "y " << (*pus)[i].prs.size() << std::endl;
+				(*pus)[i].prs.clear();
+				std::cout << "z" << std::endl;
+				for(int j = 0; j < num_pr_per_pu; ++j) {
+					std::cout << i << " " << j << std::endl;
+					(*pus)[i].prs.push_back(all_pus[i].prs[j]);
+				}
+			} else if(int(all_pus[i].prs.size()) == num_pr_per_pu) {
+				// Do nothing.
+			} else {
+				std::cerr << "Request more PRs per PU than in file" << std::endl;
+				exit(1);
+			}
+		}
+	} else if(int(all_pus.size()) == num_pu) {
+		*pus = all_pus;
+		for(int i = 0; i < num_pu; ++i) {
+			if(int(all_pus[i].prs.size()) > num_pr_per_pu) {
+				std::shuffle(all_pus[i].prs.begin(), all_pus[i].prs.end(), std::default_random_engine(time(nullptr)));
+				(*pus)[i].prs.clear();
+
+				for(int j = 0; j < num_pr_per_pu; ++j) {
+					(*pus)[i].prs.push_back(all_pus[i].prs[j]);
+				}
+			} else if(int(all_pus[i].prs.size()) == num_pr_per_pu) {
+				// Do nothing.
+			} else {
+				std::cerr << "Request more PRs per PU than in file" << std::endl;
+				exit(1);
+			}
+		}
+	} else {
+		std::cerr << "Requested more PUs than in file" << std::endl;
+		exit(1);
+	}
+
+	// SS
+	std::cout << "SS" << std::endl;
+	if(int(all_sss.size()) > num_ss) {
+		std::shuffle(all_sss.begin(), all_sss.end(), std::default_random_engine(time(nullptr)));
+		for(int i = 0; i < num_ss; ++i) {
+			sss->push_back(all_sss[i]);
+		}
+	} else if(int(all_sss.size()) == num_ss) {
+		*sss = all_sss;
+	} else {
+		std::cerr << "Requested more SSs than in file" << std::endl;
+		exit(1);
+	}
+
+	// SU
+	std::cout << "SU" << std::endl;
+	if(int(all_sus.size()) > num_su) {
+		std::shuffle(all_sus.begin(), all_sus.end(), std::default_random_engine(time(nullptr)));
+		for(int i = 0; i < num_su; ++i) {
+			sus->push_back(all_sus[i]);
+		}
+	} else if(int(all_sus.size()) == num_su) {
+		*sus = all_sus;
+	} else {
+		std::cerr << "Requested more SUs than in file" << std::endl;
+		exit(1);
+	}
+
+	// Calculate RP for SS
+	for(int j = 0; j < num_pu; ++j) {
+		std::cout << "j " << j << std::endl;
+		for(int i = 0; i < num_ss; ++i) {
+			auto pu_pl_itr = pu_pls.find(std::make_pair((*pus)[j].pl_id, (*sss)[i].pl_id));
+			if(pu_pl_itr == pu_pls.end()) {
+				std::cerr << "Can't find pu_pls: " << (*pus)[j].pl_id << ", " << (*sss)[i].pl_id << std::endl;
+				exit(1);
+			}
+
+			float path_loss = pu_pl_itr->second;
+			if(utils::unit_type == utils::UnitType::ABS) {
+				(*sss)[i].received_power += path_loss * (*pus)[j].transmit_power;
+			} else if(utils::unit_type == utils::UnitType::DB) {
+				if(j == 0) {
+					(*sss)[i].received_power = path_loss + (*pus)[j].transmit_power;
+				} else {
+					(*sss)[i].received_power = utils::todBm(utils::fromdBm((*sss)[i].received_power) + utils::fromdBm(path_loss + (*pus)[j].transmit_power));
+				}
+			}
+		}
+	}
+
+	dstr.close();
+
+	std::cout << "End" << std::endl;
+}
+
 void Generator::outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const {
 	std::ofstream out(out_filename);
 
@@ -240,7 +474,17 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 		if(pus[j].prs.size() == 1 && pus[j].loc.dist(pus[j].prs[0].loc)) {
 			pm->loadANOFile(pus[j]);
 			for(unsigned int i = 0; i < sus.size(); ++i) {
-				float v = pm->getPathLoss(pus[j].loc, sus[i].loc);
+				float v = 0.0;
+				if(pr_pls.size() > 0) {
+					auto pr_pl_itr = pr_pls.find(std::make_pair(std::make_pair(pus[j].pl_id, pus[j].prs[0].pl_id), sus[i].pl_id));
+					if(pr_pl_itr == pr_pls.end()) {
+						std::cerr << "Can't find pr_pls: " << pus[j].pl_id << ", " << pus[j].prs[0].pl_id << ", " << sus[i].pl_id << std::endl;
+						exit(1);
+					}
+					v = pr_pl_itr->second;
+				} else {
+					v = pm->getPathLoss(pus[j].loc, sus[i].loc);
+				}
 				path_losses[j][i][0] = v;
 			}
 		} else {
@@ -248,7 +492,17 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 				pm->loadANOFile(pus[j].prs[x]);
 				
 				for(unsigned int i = 0; i < sus.size(); ++i) {
-					float v = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
+					float v = 0.0;
+					if(pr_pls.size() > 0) {
+						auto pr_pl_itr = pr_pls.find(std::make_pair(std::make_pair(pus[j].pl_id, pus[j].prs[x].pl_id), sus[i].pl_id));
+						if(pr_pl_itr == pr_pls.end()) {
+							std::cerr << "Can't find pr_pls: " << pus[j].pl_id << ", " << pus[j].prs[x].pl_id << ", " << sus[i].pl_id << std::endl;
+							exit(1);
+						}
+						v = pr_pl_itr->second;
+					} else {
+						v = pm->getPathLoss(pus[j].loc, sus[i].loc);
+					}
 					path_losses[j][i][x] = v;
 				}
 			}

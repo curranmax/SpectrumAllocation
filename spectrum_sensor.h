@@ -12,17 +12,20 @@ class SpectrumSensor {
 public:
 	SpectrumSensor() : loc(), received_power(0.0) {}
 	SpectrumSensor(const Location& _loc, float _received_power) : loc(_loc), received_power(_received_power) {}
-	SpectrumSensor(const SpectrumSensor& ss) : loc(ss.loc), received_power(ss.received_power) {}
+	SpectrumSensor(const SpectrumSensor& ss) : loc(ss.loc), received_power(ss.received_power), pl_id(ss.pl_id) {}
 
 	const SpectrumSensor& operator=(const SpectrumSensor& ss) {
 		this->loc = ss.loc;
 		this->received_power = ss.received_power;
+		this->pl_id = ss.pl_id;
 		return *this;
 	}
 
 	Location loc;
 
 	float received_power;
+
+	int pl_id;
 };
 
 class SpectrumSensorInt : public Entity {

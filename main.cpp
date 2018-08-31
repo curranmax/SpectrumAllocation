@@ -40,7 +40,7 @@ int main(int argc, char const *argv[]) {
 	utils::setUnitType(args.unit_type);
 
 	// Set up ground truth propagation model
-	PropagationModel* pm;
+	PropagationModel* pm = nullptr;
 	if(args.propagation_model == "log_distance") {
 		pm = new LogDistancePM(args.ld_path_loss0, args.ld_dist0, args.ld_gamma);
 	} else if (args.propagation_model == "longley_rice") {
@@ -50,6 +50,8 @@ int main(int argc, char const *argv[]) {
 	} else if(args.propagation_model == "single_lr") {
 		pm = new TransmitterOnlySplatPM(args.splat_cmd, args.ref_lat, args.ref_long,
 										args.splat_dir, args.sdf_dir, args.return_dir);
+	} else if(args.propagation_model == "input_file") {
+		// Nothing for now
 	} else {
 		std::cerr << "Unknown propagation model: " << args.propagation_model << std::endl;
 		exit(0);
@@ -61,7 +63,11 @@ int main(int argc, char const *argv[]) {
 	std::vector<PU> pus;
 	std::vector<SS> sss;
 	std::vector<SU> sus;
-	gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus);
+	if(args.in_filename == "") {
+		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus);
+	} else {
+		gen.getEntitiesFromFile(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.in_filename, &pus, &sss, &sus);
+	}
 	
 	// Set up Spectrum Manager params
 	float factor = 1 << args.num_float_bits;

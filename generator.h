@@ -29,7 +29,7 @@ public:
 class Generator {
 public:
 	Generator() = delete;
-	Generator(float location_range_, PropagationModel* pm_) : location_range(location_range_), pm(pm_) {}
+	Generator(float location_range_, PropagationModel* pm_) : location_range(location_range_), pm(pm_), pr_pls() {}
 	Generator(const Generator& gen) = delete;
 
 	~Generator() {
@@ -39,6 +39,9 @@ public:
 	void generateEntities(int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string& out_filename,
 						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const;
 
+	void getEntitiesFromFile(int num_pu, int num_ss, int num_su, int num_pr_per_pu, const std::string& in_filename,
+						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus);
+
 	void outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const;
 
 	std::vector<float> computeGroundTruth(const std::vector<SU>& su, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const;
@@ -47,6 +50,8 @@ private:
 	float location_range;
 
 	PropagationModel* pm;
+
+	std::map<std::pair<std::pair<int, int>, int>, float> pr_pls;
 };
 
 class LogDistancePM : public PropagationModel {

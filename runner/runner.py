@@ -522,7 +522,7 @@ if __name__ == '__main__':
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'secure_write_algo':['proposed', 'spc'], 'central_entities': ['two_sms', 'sm_ks']}
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] #, secure_write_algo_test]
 
 			for i in range(len(changes)):
 				changes[i]['central_entities'] = ['sm_ks']

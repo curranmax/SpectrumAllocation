@@ -14,13 +14,14 @@ class SecondaryUser {
 public:
 	SecondaryUser() : index(0), loc() {}
 	SecondaryUser(int _index, const Location& _loc) : index(_index), loc(_loc), less_max_tp(0.0), min_tp(0.0) {}
-	SecondaryUser(const SecondaryUser& su) : index(su.index), loc(su.loc), less_max_tp(su.less_max_tp), min_tp(su.min_tp) {}
+	SecondaryUser(const SecondaryUser& su) : index(su.index), loc(su.loc), less_max_tp(su.less_max_tp), min_tp(su.min_tp), pl_id(su.pl_id) {}
 
 	const SecondaryUser& operator=(const SecondaryUser& su) {
 		this->index = su.index;
 		this->loc = su.loc;
 		this->less_max_tp = su.less_max_tp;
 		this->min_tp = su.min_tp;
+		this->pl_id = su.pl_id;
 		return *this;
 	}
 
@@ -29,6 +30,8 @@ public:
 	Location loc;
 
 	float less_max_tp, min_tp;
+
+	int pl_id;
 };
 
 class SecondaryUserInt : public Entity {
