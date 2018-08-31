@@ -52,6 +52,7 @@ int main(int argc, char const *argv[]) {
 										args.splat_dir, args.sdf_dir, args.return_dir);
 	} else if(args.propagation_model == "input_file") {
 		// Nothing for now
+		pm = new NullPropagationModel();
 	} else {
 		std::cerr << "Unknown propagation model: " << args.propagation_model << std::endl;
 		exit(0);

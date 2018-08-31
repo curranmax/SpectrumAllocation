@@ -526,9 +526,9 @@ void SpectrumManager::secureRadarPreprocess(std::array<Party, 2> parties) {
 				sss_rp_from_pu = rp_weights[j] * sss_rp[i] / sum_rp_weights;
 			} else if(utils::unit_type == utils::UnitType::DB) {
 				sInt log_rp_weight;
-				utils::secureLog10(
+				utils::secureLog10_v2(
 					&log_rp_weight, factor_int * rp_weights[j] / sum_rp_weights,
-					zero, factor_int, ln_ten, LOG_CALC_ITERS);
+					parties, sm_params->bit_count, sm_params->factor, factor_int);
 
 				sss_rp_from_pu = ten * log_rp_weight + sss_rp[i];
 			} else {
@@ -1177,7 +1177,7 @@ float SpectrumManager::secureRadar(
 			sInt dist_ratio = factor_int * su_pr_dist_squared / su_pu_dist_squared;
 		
 			sInt log_dist_ratio;
-			utils::secureLog10(&log_dist_ratio, dist_ratio, zero, factor_int, ln_ten, LOG_CALC_ITERS);
+			utils::secureLog10_v2(&log_dist_ratio, dist_ratio, parties, sm_params->bit_count, sm_params->factor, factor_int);
 			sInt pr_est_path_loss = pu_est_path_loss + ten * pl_est_gamma / factor_int * log_dist_ratio / factor_int / two_int;
 		
 			sInt this_su_tp;
@@ -1262,7 +1262,7 @@ float SpectrumManager::secureRadar(
 			ten_to_diff = factor_int - ten_to_diff;
 
 			sInt log_diff;
-			utils::secureLog10(&log_diff, ten_to_diff, zero, factor_int, ln_ten, LOG_CALC_ITERS);
+			utils::secureLog10_v2(&log_diff, ten_to_diff, parties, sm_params->bit_count, sm_params->factor, factor_int);
 
 			sInt update = ten * log_diff;
 

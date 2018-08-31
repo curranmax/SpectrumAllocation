@@ -31,10 +31,15 @@ void dist(sInt* dist, const sInt& x1, const sInt& y1, const sInt& x2, const sInt
 			const sInt& zero, const sInt& two, int num_iters);
 
 // Only works for values between 0 and 2, and is less accurate near the edges.
-void secureLog10(
-	sInt* ans, const sInt& v,
-	const sInt& zero, const sInt& factor_int, const sInt& ln_10,
-	int num_iters);
+void secureLog10_v1(
+		sInt* ans, const sInt& v,
+		const sInt& zero, const sInt& factor_int, const sInt& ln_10,
+		int num_iters);
+
+void secureLog10_v2(
+		sInt* ans, const sInt& v,
+		std::array<Party, 2>& parties, int bit_count,
+		float factor, const sInt& factor_int);
 
 void securePow10(
 		sInt* ans, const sInt& v,

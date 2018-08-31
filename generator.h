@@ -54,6 +54,13 @@ private:
 	std::map<std::pair<std::pair<int, int>, int>, float> pr_pls;
 };
 
+class NullPropagationModel : public PropagationModel {
+public:
+	NullPropagationModel() {}
+
+	float getPathLoss(const Location& loc1, const Location& loc2) const { return 0.0; }
+};
+
 class LogDistancePM : public PropagationModel {
 public:
 	LogDistancePM() = delete;

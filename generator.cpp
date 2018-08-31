@@ -280,28 +280,20 @@ void Generator::getEntitiesFromFile(
 			exit(1);
 		}
 	}
-	std::cout << all_pus.size() << " " << all_sss.size() << " " << all_sus.size() << std::endl;
-	std::cout << pu_pls.size() << " " << pr_pls.size() << std::endl;
+	// std::cout << all_pus.size() << " " << all_sss.size() << " " << all_sus.size() << std::endl;
+	// std::cout << pu_pls.size() << " " << pr_pls.size() << std::endl;
 
 	// Randomly choose a subset of the values.
 	// PU
-	std::cout << "PU" << std::endl;
 	if(int(all_pus.size()) > num_pu) {
-		std::cout << "A" << std::endl;
 		std::shuffle(all_pus.begin(), all_pus.end(), std::default_random_engine(time(nullptr)));
 		for(int i = 0; i < num_pu; ++i) {
-			std::cout << i << std::endl;
 			pus->push_back(all_pus[i]);
-			std::cout << i << " " << all_pus[i].prs.size() << std::endl;
 
 			if(int(all_pus[i].prs.size()) > num_pr_per_pu) {
-				std::cout << "x" << std::endl;
 				std::shuffle(all_pus[i].prs.begin(), all_pus[i].prs.end(), std::default_random_engine(time(nullptr)));
-				std::cout << "y " << (*pus)[i].prs.size() << std::endl;
 				(*pus)[i].prs.clear();
-				std::cout << "z" << std::endl;
 				for(int j = 0; j < num_pr_per_pu; ++j) {
-					std::cout << i << " " << j << std::endl;
 					(*pus)[i].prs.push_back(all_pus[i].prs[j]);
 				}
 			} else if(int(all_pus[i].prs.size()) == num_pr_per_pu) {
@@ -334,7 +326,6 @@ void Generator::getEntitiesFromFile(
 	}
 
 	// SS
-	std::cout << "SS" << std::endl;
 	if(int(all_sss.size()) > num_ss) {
 		std::shuffle(all_sss.begin(), all_sss.end(), std::default_random_engine(time(nullptr)));
 		for(int i = 0; i < num_ss; ++i) {
@@ -348,7 +339,6 @@ void Generator::getEntitiesFromFile(
 	}
 
 	// SU
-	std::cout << "SU" << std::endl;
 	if(int(all_sus.size()) > num_su) {
 		std::shuffle(all_sus.begin(), all_sus.end(), std::default_random_engine(time(nullptr)));
 		for(int i = 0; i < num_su; ++i) {
@@ -363,7 +353,6 @@ void Generator::getEntitiesFromFile(
 
 	// Calculate RP for SS
 	for(int j = 0; j < num_pu; ++j) {
-		std::cout << "j " << j << std::endl;
 		for(int i = 0; i < num_ss; ++i) {
 			auto pu_pl_itr = pu_pls.find(std::make_pair((*pus)[j].pl_id, (*sss)[i].pl_id));
 			if(pu_pl_itr == pu_pls.end()) {
@@ -385,8 +374,6 @@ void Generator::getEntitiesFromFile(
 	}
 
 	dstr.close();
-
-	std::cout << "End" << std::endl;
 }
 
 void Generator::outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const {
@@ -455,6 +442,8 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 }
 
 std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const {
+	std::cout << "Start computeGroundTruth" << std::endl;
+
 	std::vector<PU> pus = input_pus;
 
 	std::vector<std::vector<std::vector<float> > > path_losses; // path_losses[j][i][x] is the path loss between su i and PU j's PR x.
@@ -551,6 +540,8 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 			}
 		}
 	}
+
+	std::cout << "Emd computeGroundTruth" << std::endl;
 	return tps;
 }
 

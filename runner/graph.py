@@ -273,7 +273,8 @@ x_labels = {('num_ss_selection',): 'Number of SS Selected',
 			('ss_receive_power_alpha',): 'Receive Power Alpha',
 			('ss_path_loss_alpha',): 'Path Loss Alpha',
 			('num_ss',): 'Total Number of SS',
-			('num_pu',): 'Total Number of PU'}
+			('num_pu',): 'Total Number of PU',
+			('s2_pc_bit_count',): 'Bits per Value in S2-PC'}
 
 def getXLabel(xv):
 	if xv in x_labels:
@@ -338,7 +339,7 @@ if __name__ == '__main__':
 
 
 	# Group values
-	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa')]
+	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa'), ('central_entities', 'ces')]
 	for full_gv, short_gv in g_values:
 		parser.add_argument('-g_' + short_gv, '--use_' + full_gv + '_for_group_value', action = 'store_true', help = 'If given, uses ' + full_gv + ' for grouping data.')
 
@@ -426,6 +427,8 @@ if __name__ == '__main__':
 	for full_gv, _ in g_values:
 		if getattr(args, 'use_' + full_gv + '_for_group_value'):
 			gv.append(full_gv)
+
+	print gv
 
 	fv = {}
 	for full_fv, _ in f_values:

@@ -15,6 +15,9 @@ using namespace osuCrypto;
 #define POW_RAND_MIN -1.0
 #define POW_RAND_MAX -1.0
 
+#define LOG_RAND_MIN 0.5
+#define LOG_RAND_MAX 2.0
+
 utils::UnitType utils::unit_type = utils::UnitType::ABS;
 
 void utils::setUnitType(const std::string& unit_type_str) {
@@ -56,7 +59,7 @@ void utils::dist(sInt* dist, const sInt& x1, const sInt& y1, const sInt& x2, con
 				num_iters, two);
 }
 
-void utils::secureLog10(
+void utils::secureLog10_v1(
 		sInt* ans, const sInt& v,
 		const sInt& zero, const sInt& factor_int, const sInt& ln_10,
 		int num_iters) {
@@ -79,21 +82,38 @@ void utils::secureLog10(
 		}
 	}
 
-	// sInt num   = v - factor_int;
-	// sInt denom = factor_int + zero;
-	// sInt sign  = factor_int + zero;
-
-	// for(int i = 0; i < num_iters; ++i) {
-	// 	*ans = (*ans) + sign * num / denom;
-
-	// 	if(i < num_iters - 1) {
-	// 		num   = num * (v - factor_int) / factor_int;
-	// 		denom = denom + factor_int;
-	// 		sign  = zero - sign;
-	// 	}
-	// }
-
 	*ans = (factor_int + factor_int) * (*ans) / ln_10;
+}
+
+void utils::secureLog10_v2(
+		sInt* ans, const sInt& v,
+		std::array<Party, 2>& parties, int bit_count,
+		float factor, const sInt& factor_int) {
+	float rv = randomFloat(LOG_RAND_MIN, LOG_RAND_MAX);
+	sInt rv_secure = INPUT(parties, 0, int(rv * factor), bit_count);
+
+	sInt v_times_rv_secure = v * rv_secure / factor_int;
+	
+	parties[1].reveal(v_times_rv_secure);
+	float v_times_rv = 0.0;
+	if(parties[1].isLocalParty()) {
+		v_times_rv = float(v_times_rv_secure.getValue()) / factor;
+	}
+	parties[0].getRuntime().processesQueue();
+
+	float log_rv = 0.0;
+	float log_v_times_rv = 0.0;
+	if(parties[0].isLocalParty()) {
+		log_rv = log10(rv);
+	}
+	if(parties[1].isLocalParty()) {
+		log_v_times_rv = log10(v_times_rv);
+	}
+
+	sInt log_rv_secure = INPUT(parties, 0, int(log_rv * factor), bit_count);
+	sInt log_v_times_rv_secure = INPUT(parties, 0, int(log_v_times_rv * factor), bit_count);
+
+	*ans = log_v_times_rv_secure - log_rv_secure;
 }
 
 void utils::securePow10(
@@ -110,7 +130,7 @@ void utils::securePow10(
 	parties[1].reveal(v_plus_rv_secure);
 	float v_plus_rv = 0.0;
 	if(parties[1].isLocalParty()) {
-		v_plus_rv = float(v_plus_rv_secure.getValue()) / float(factor);
+		v_plus_rv = float(v_plus_rv_secure.getValue()) / factor;
 	}
 	parties[0].getRuntime().processesQueue();
 
