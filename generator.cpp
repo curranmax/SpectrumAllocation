@@ -351,6 +351,11 @@ void Generator::getEntitiesFromFile(
 		exit(1);
 	}
 
+	// Set su.index
+	for(unsigned int i = 0; i < sus->size(); ++i) {
+		(*sus)[i].index = i;
+	}
+
 	// Calculate RP for SS
 	for(int j = 0; j < num_pu; ++j) {
 		for(int i = 0; i < num_ss; ++i) {
