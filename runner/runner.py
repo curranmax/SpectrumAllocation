@@ -519,8 +519,9 @@ if __name__ == '__main__':
 			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
 			num_bits_test['s2_pc_bit_count'] = [32, 48, 64]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'naive']
+			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] #, secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
