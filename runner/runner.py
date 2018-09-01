@@ -497,7 +497,7 @@ if __name__ == '__main__':
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
-			num_su = 2
+			num_su = 50
 			if experiment == FULL_TEST_SM_KS:
 				num_su = 2
 
