@@ -497,11 +497,15 @@ if __name__ == '__main__':
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
+			num_su = 100
+			if experiment == FULL_TEST_SM_KS:
+				num_su = 2
+
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(1000, 1000)],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
-					'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
+					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks'])}
 
