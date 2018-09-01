@@ -497,7 +497,7 @@ if __name__ == '__main__':
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
-			num_su = 100
+			num_su = 2
 			if experiment == FULL_TEST_SM_KS:
 				num_su = 2
 
@@ -520,7 +520,7 @@ if __name__ == '__main__':
 			num_bits_test['s2_pc_bit_count'] = [32, 48, 64]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'naive']
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] #, secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test, num_bits_test, secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
