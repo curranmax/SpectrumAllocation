@@ -51,7 +51,7 @@ public:
 	void setSecureWriteAlgo(const std::string algo_string) {
 		if(algo_string == "proposed") { secure_write_algo = SecureWriteAlgo::PROPOSED; }
 		else if(algo_string == "spc") { secure_write_algo = SecureWriteAlgo::SPC; }
-		else { std::cerr << "Unknown selection_algo: " << algo_string << std::endl; exit(1); }
+		else { std::cerr << "Unknown secure_write_algo: " << algo_string << std::endl; exit(1); }
 	}
 
 	void setGridParams(int _grid_min_num_pu, int _grid_min_num_ss, int _grid_num_x, int _grid_num_y, float _grid_delta_x, float _grid_delta_y) {

@@ -1,6 +1,7 @@
 
 #include "generator.h"
 
+#include "debug_print.h"
 #include "timer.h"
 #include "location.h"
 #include "primary_user.h"
@@ -447,6 +448,8 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 }
 
 std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const {
+	P("start Generator::computeGroundTruth");
+
 	std::vector<PU> pus = input_pus;
 
 	std::vector<std::vector<std::vector<float> > > path_losses; // path_losses[j][i][x] is the path loss between su i and PU j's PR x.
@@ -543,6 +546,7 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 			}
 		}
 	}
+	P("end Generator::computeGroundTruth");
 	return tps;
 }
 

@@ -51,7 +51,7 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 	}
 
 	// Check
-	/*for(auto ss_itr = grid_table->sss.begin(); ss_itr != grid_table->sss.end(); ++ss_itr) {
+/*	for(auto ss_itr = grid_table->sss.begin(); ss_itr != grid_table->sss.end(); ++ss_itr) {
 		auto pu_itr = grid_table->pu_refs.find(ss_itr->first);
 		if(pu_itr == grid_table->pu_refs.end()) {
 			std::cerr << "AAAAAA" << std::endl;

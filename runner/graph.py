@@ -254,7 +254,7 @@ def dbDifference(v1, v2, unit_type):
 			v1 = math.pow(10.0, -50.0)
 		v1 = 10.0 * math.log(v1, 10.0)
 		v2 = 10.0 * math.log(v2, 10.0)
-	return abs(v1 - v2)
+	return v1 - v2
 
 def pathLossError(v1, v2, unit_type):
 	if unit_type == 'abs':
@@ -427,8 +427,6 @@ if __name__ == '__main__':
 	for full_gv, _ in g_values:
 		if getattr(args, 'use_' + full_gv + '_for_group_value'):
 			gv.append(full_gv)
-
-	print gv
 
 	fv = {}
 	for full_fv, _ in f_values:

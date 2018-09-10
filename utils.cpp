@@ -111,7 +111,7 @@ void utils::secureLog10_v2(
 	}
 
 	sInt log_rv_secure = INPUT(parties, 0, int(log_rv * factor), bit_count);
-	sInt log_v_times_rv_secure = INPUT(parties, 0, int(log_v_times_rv * factor), bit_count);
+	sInt log_v_times_rv_secure = INPUT(parties, 1, int(log_v_times_rv * factor), bit_count);
 
 	*ans = log_v_times_rv_secure - log_rv_secure;
 }

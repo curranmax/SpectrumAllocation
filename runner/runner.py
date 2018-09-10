@@ -7,6 +7,8 @@ from operator import mul
 from copy import deepcopy
 import math
 
+import time
+
 # Experiments
 TEST = 'test'
 
@@ -149,7 +151,7 @@ class ExperimentParam:
 def makeExperimentResult(vals):
 	result = ExperimentResult()
 	for val in vals:
-		if '|' not in val:
+		if val.count('|') != 2:
 			print 'Could\'t parse val:', val
 			continue
 
@@ -230,8 +232,8 @@ class ExperimentResult:
 
 		raise Exception('Invalid attribute: ' + str(yv))
 
-def writeOutParamResult(filename, out_values):
-	f = open(filename, 'a')
+def writeOutParamResult(filename, out_values, append = True):
+	f = open(filename, ('a' if append else 'w'))
 	
 	shared_param, shared_param_str = getSharedParam(out_values)
 	f.write('PARAM ' + shared_param_str + '\n')
@@ -255,7 +257,10 @@ def readInParamResult(filenames):
 	rv = []
 
 	for filename in filenames:
-		f = open(filename, 'r')
+		try:
+			f = open(filename, 'r')
+		except IOError:
+			continue
 
 		cur_params = None
 		cur_param_cols = None
@@ -294,7 +299,12 @@ def readInParamResult(filenames):
 				rv.append((this_params, this_result))
 	return rv
 
-def runExperiment(param, no_run = False):
+def appendParamResult(filename, out_value):
+	out_values = readInParamResult([filename])
+	out_values.append(out_value)
+	writeOutParamResult(filename, out_values, append = False)
+
+def runExperiment(param, no_run = False, debug_print = False):
 	args = ['../s2pc', '-brief_out']
 
 	var_flag_names = {
@@ -338,6 +348,15 @@ def runExperiment(param, no_run = False):
 				print bcolors.WARNING + bcolors.UNDERLINE + 'Not running the most up to date version of code' + bcolors.ENDC
 
 			process = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
+			result_lines = []
+			for line in iter(process.stdout.readline, ''):
+				if line.count('|') != 2:
+					if debug_print:
+						print line.rstrip()
+				else:
+					result_lines.append(line)
+
 			process.wait()
 
 			if process.returncode != 0:
@@ -354,7 +373,7 @@ def runExperiment(param, no_run = False):
 			if process.returncode != 0 or len(err_out) != 0:
 				continue
 
-			rv = makeExperimentResult([v[:-1] for v in process.stdout])
+			rv = makeExperimentResult([v[:-1] for v in result_lines])
 			break
 
 		return rv
@@ -476,6 +495,7 @@ if __name__ == '__main__':
 	parser.add_argument('-nt', '--num_tests', metavar = 'NUM_TESTS', type = int, nargs = 1, default = [1], help = 'Number of tests to run')
 	parser.add_argument('-skip', '--skip_s2pc', action = 'store_true', help = 'If given, skips the s2pc algorithm')
 	parser.add_argument('-hd', '--use_splat_hd', action = 'store_true', help = 'If given, uses splat-hd instead of splat')
+	parser.add_argument('-debug', '--debug_print', action = 'store_true', help = 'If given, prints anything from the stdout of s2pc')
 
 	parser.add_argument('-nr', '--no_run', action = 'store_true', help = 'If given, doesn\'t run the tests, simply outputs the commands')
 
@@ -486,23 +506,23 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'num_pu_selection': [2], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
+			changes.append({NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
 							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
 							'location_range': [100.0], 'num_ss': [100], 'num_su': [1], 'unit_type': ['db'],
-							'num_pr_per_pu': [1], 'pr_range': [0.0]})
+							'num_pr_per_pu': [5], 'pr_range': [10.0]})
 		if experiment == VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
-			num_su = 50
+			num_su = 100
 			if experiment == FULL_TEST_SM_KS:
 				num_su = 2
 
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
-					('grid_x', 'grid_y'): [(1000, 1000)],
+					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
@@ -516,12 +536,12 @@ if __name__ == '__main__':
 			secure_write_algo_test = deepcopy(default_values)
 
 			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
-			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
+			num_pu_s_test['num_pu_selection'] = [25] # [1, 10, 25, 50]
 			num_bits_test['s2_pc_bit_count'] = [32, 48, 64]
-			secure_write_algo_test['secure_write_algo'] = ['proposed', 'naive']
+			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] #, secure_write_algo_test]
+			changes += [num_pu_s_test] # [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
@@ -565,6 +585,10 @@ if __name__ == '__main__':
 	exp_num = 1
 	durs = []
 	begin_time = None
+	out_file = args.out_file[0]
+	if out_file == None:
+		out_file = current_time.strftime('data/out_%b-%d_%H:%M:%S_' + (args.name_of_experiment[0] if args.name_of_experiment[0] != None else '-'.join(experiments)) + '.txt')
+
 	for i in range(args.num_tests[0]):
 		for change in changes:
 			ns = change.keys()
@@ -589,8 +613,10 @@ if __name__ == '__main__':
 				start = datetime.now()
 				if begin_time == None:
 					begin_time = start
-				result = runExperiment(param, no_run = args.no_run)
+				result = runExperiment(param, no_run = args.no_run, debug_print = args.debug_print)
 				if result != None:
+					appendParamResult(out_file, (param, result))
+
 					out_values.append((param, result))
 				else:
 					print bcolors.BOLD + bcolors.FAIL + 'Experiment failed to finish' + bcolors.ENDC
@@ -612,11 +638,4 @@ if __name__ == '__main__':
 
 	end = datetime.now()
 	print 'All Experiments took', bcolors.BOLD + bcolors.WARNING + str(end - begin_time) + bcolors.ENDC
-
-	if len(out_values) > 0:
-		out_file = args.out_file[0]
-		if out_file == None:
-			out_file = current_time.strftime('data/out_%b-%d_%H:%M:%S_' + (args.name_of_experiment[0] if args.name_of_experiment[0] != None else '-'.join(experiments)) + '.txt')
-
-		writeOutParamResult(out_file, out_values)
 	

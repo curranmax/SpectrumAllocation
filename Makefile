@@ -16,7 +16,7 @@ LIB_PATH = $(IVORY_LIB) $(LIBOTE_LIB) $(BOOST_LIB) $(MIRACL_LIB) $(CRYPTO_LIB) $
 CC = g++
 CFLAGS = -Wall -std=c++14
 
-SOURCES = main.cpp spectrum_manager.cpp generator.cpp args.cpp location.cpp split.cpp timer.cpp utils.cpp tables.cpp path_loss_table.cpp su_server.cpp key_server.cpp
+SOURCES = main.cpp spectrum_manager.cpp generator.cpp args.cpp location.cpp split.cpp timer.cpp utils.cpp tables.cpp path_loss_table.cpp su_server.cpp key_server.cpp debug_print.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 NAME = s2pc
 
