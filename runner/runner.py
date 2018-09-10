@@ -536,7 +536,7 @@ if __name__ == '__main__':
 			secure_write_algo_test = deepcopy(default_values)
 
 			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
-			num_pu_s_test['num_pu_selection'] = [25] # [1, 10, 25, 50]
+			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
 			num_bits_test['s2_pc_bit_count'] = [32, 48, 64]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
