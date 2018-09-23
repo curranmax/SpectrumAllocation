@@ -556,11 +556,12 @@ if __name__ == '__main__':
 							'skip_s2pc': [True]})
 		
 		if experiment == KS_TIMING:
-			changes.append({NUM_SS_SELECTION: [1, 10, 25], 'num_pu_selection': [1, 10, 25],
+			changes.append({NUM_SS_SELECTION: [1, 10, 25], 'num_pu_selection': [1, 10, 25], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 							('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
 							'num_pr_per_pu' : [5], 'pr_range': [100.0],
 							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 							'num_pu': [400], 'num_ss': [4000], 'num_su': [2],
+							PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'central_entities': ['sm_ks']})
 
 		if experiment == MED_TEST:
