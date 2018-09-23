@@ -12,8 +12,8 @@ using namespace osuCrypto;
 
 #define INPUT(parties, party_id, val, bit_count) parties[party_id].isLocalParty() ? parties[party_id].input<sInt>(val, bit_count) : parties[party_id].input<sInt>(bit_count)
 
-#define POW_RAND_MIN -1.0
-#define POW_RAND_MAX -1.0
+#define POW_RAND_MIN 2.5
+#define POW_RAND_MAX 2.5
 
 #define LOG_RAND_MIN 0.5
 #define LOG_RAND_MAX 2.0
@@ -145,10 +145,10 @@ void utils::securePow10(
 	}
 
 	// Input values to S2-PC and calculate desired result
-	sInt ten_to_rv_secure = INPUT(parties, 0, ten_to_rv, bit_count);
-	sInt ten_to_v_plus_rv_secure = INPUT(parties, 1, ten_to_v_plus_rv, bit_count);
+	sInt ten_to_rv_secure = INPUT(parties, 0, int(ten_to_rv * factor), bit_count);
+	sInt ten_to_v_plus_rv_secure = INPUT(parties, 1, int(ten_to_v_plus_rv * factor), bit_count);
 
-	*ans = factor_int * ten_to_rv_secure / ten_to_v_plus_rv_secure;
+	*ans = factor_int * ten_to_v_plus_rv_secure / ten_to_rv_secure;
 }
 
 float utils::todBm(float rp_in_mW) {

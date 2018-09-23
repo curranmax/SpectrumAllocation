@@ -127,9 +127,9 @@ public:
 
 	std::vector<float> runSM(
 			const std::map<int, std::vector<int> >& precomputed_pu_groups, const std::map<int, std::vector<int> >& precomputed_ss_groups,
-			Timer* timer);
+			Timer* timer, std::map<std::string, Timer>& en_timers);
 
-	std::vector<float> runKS(int num_sus);
+	std::vector<float> runKS(int num_sus, std::map<std::string, Timer>& en_timers);
 
 	// Assumes that each PU has a single PR and they are at the same location.
 	void secureRadarPreprocess(std::array<Party, 2> parties);
@@ -156,11 +156,11 @@ public:
 			const std::vector<std::pair<sInt, std::vector<sInt> > >& updates,
 			Channel* sm_ch) const;
 
-	void sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table);
-	void recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table);
+	void sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
+	void recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers);
 
-	void sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table);
-	void recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table);
+	void sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
+	void recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table, std::map<std::string, Timer>& en_timers);
 
 	bool useGrid() const { return sm_params->use_grid; }
 private:
@@ -202,6 +202,7 @@ public:
 	float plainTextRadar(const SU& su,
 							std::vector<PU*>& pus,
 							const std::vector<const SS*>& sss,
+							const std::vector<std::vector<float> >& received_powers,
 							PathLossTable* path_loss_table) const;
 
 	bool useGrid() const { return sm_params->use_grid; }

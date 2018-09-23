@@ -28,8 +28,6 @@ using namespace osuCrypto;
 
 #define INPUT(parties, party_id, val, bit_count) parties[party_id].isLocalParty() ? parties[party_id].input<sInt>(val, bit_count) : parties[party_id].input<sInt>(bit_count)
 
-#define PRINT(prefix, var) { sInt tmp = var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { std::cout << prefix << " " << float(tmp.getValue()) / sm_params->factor << std::endl; } parties[1].getRuntime().processesQueue(); }
-
 #define LN_TEN 2.30258509299404568401
 #define LOG_CALC_ITERS 10
 
@@ -183,7 +181,7 @@ std::vector<float> SpectrumManager::run(
 	}
 	for(unsigned int i = 0; i < all_sus.size(); ++i) {
 		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
-			std::cout << "Starting request for SU " << i + 1 << std::endl;
+			std::cout << "Starting SEC request for SU " << i + 1 << std::endl;
 		}
 		PWID("start SU " + std::to_string(i));
 		
@@ -203,7 +201,7 @@ std::vector<float> SpectrumManager::run(
 		su_rps.push_back(v);
 
 		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
-			std::cout << "Finished request for SU " << i + 1 << std::endl;
+			std::cout << "Finished SEC request for SU " << i + 1 << std::endl;
 		}
 	}
 	return su_rps;
@@ -212,7 +210,8 @@ std::vector<float> SpectrumManager::run(
 std::vector<float> SpectrumManager::runSM(
 		const std::map<int, std::vector<int> >& precomputed_pu_groups,
 		const std::map<int, std::vector<int> >& precomputed_ss_groups,
-		Timer* timer) {
+		Timer* timer,
+		std::map<std::string, Timer>& en_timers) {
 	std::string address = "127.0.0.1:9000";
 
 	auto session_mode = SessionMode::Client;
@@ -327,7 +326,7 @@ std::vector<float> SpectrumManager::runSM(
 		timer->start(Timer::secure_su_request);
 
 		// Send encrypted tables to KS
-		sendEncryptedData(&sm_ch, en_sus[i], en_grid_table, en_pu_table);
+		sendEncryptedData(&sm_ch, en_sus[i], en_grid_table, en_pu_table, en_timers);
 
 		if(sm_params->use_grid) {
 			selected_pus.clear();
@@ -339,7 +338,7 @@ std::vector<float> SpectrumManager::runSM(
 		float v = secureRadar(parties, all_sus[i], selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
 
 		// Get updated PR thresholds form KS
-		recvEncryptedPRThresholds(&sm_ch, &en_pu_table);
+		recvEncryptedPRThresholds(&sm_ch, &en_pu_table, en_timers);
 
 		timer->end(Timer::secure_su_request);
 
@@ -352,7 +351,7 @@ std::vector<float> SpectrumManager::runSM(
 	return su_rps;
 }
 
-std::vector<float> SpectrumManager::runKS(int num_sus) {
+std::vector<float> SpectrumManager::runKS(int num_sus, std::map<std::string, Timer>& en_timers) {
 	std::string address = "127.0.0.1:9000";
 
 	auto session_mode = SessionMode::Client;
@@ -418,7 +417,7 @@ std::vector<float> SpectrumManager::runKS(int num_sus) {
 		}
 
 		// Send encrypted tables to KS
-		recvEncryptedData(&sm_ch, &su, &grid_table, &pu_table);
+		recvEncryptedData(&sm_ch, &su, &grid_table, &pu_table, en_timers);
 
 		if(sm_params->use_grid) {
 			selected_pus.clear();
@@ -430,7 +429,7 @@ std::vector<float> SpectrumManager::runKS(int num_sus) {
 		float v = secureRadar(parties, su, selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
 
 		// Send updated PR thresholds form KS
-		sendEncryptedPRThresholds(&sm_ch, pu_table);
+		sendEncryptedPRThresholds(&sm_ch, pu_table, en_timers);
 
 		su_rps.push_back(v);
 
@@ -583,18 +582,31 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 	llong factor_int = llong(sm_params->factor);
 
+	int dist_scale = 1 << 28;
+	float ratio_thresh = 1.0;
+
 	for(unsigned int i = 0; i < sss_int0->size(); ++i) {
 		std::vector<llong> rp_weights;
 		llong sum_rp_weights = 0;
+
 		bool all_zero = true;
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
 			// Compute weight
 			llong dist = 0;
+			float rdist = 0.0;
 			if(sm_params->rp_alpha == 2) {
 				llong x_diff = (((pus_int0[j].loc.x + pus_int1[j].loc.x) ^ bit_mask) - (((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) ^ bit_mask)) ^ bit_mask;
 				llong y_diff = (((pus_int0[j].loc.y + pus_int1[j].loc.y) ^ bit_mask) - (((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) ^ bit_mask)) ^ bit_mask;
 
+				float rx_diff = (pus_int0[j].loc.x + pus_int1[j].loc.x) / sm_params->factor - ((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) / sm_params->factor;
+				float ry_diff = (pus_int0[j].loc.y + pus_int1[j].loc.y) / sm_params->factor - ((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) / sm_params->factor;
+
 				dist = ((((x_diff * x_diff) ^ bit_mask) + ((y_diff * y_diff) ^ bit_mask)) / factor_int) ^ bit_mask;
+				rdist = rx_diff * rx_diff + ry_diff * ry_diff;
+				if(rdist < 0.25) {
+					std::cout << "Warning small distance detected: " << rdist << std::endl;
+				}
+				// PDIF("Dist:", rdist, dist, 0.000001);
 			} else {
 				std::cerr << "(Currently) Unsupported rp_alpha: " << sm_params->rp_alpha << std::endl;
 				exit(1);
@@ -602,23 +614,19 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 			llong this_weight = 0;
 			if(dist <= 1) {
-				this_weight = (factor_int * factor_int) ^ bit_mask;
+				this_weight = (((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask;
 			} else {
-				this_weight = (((factor_int * factor_int) ^ bit_mask) / dist) ^ bit_mask;
+				this_weight = (((((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask) / dist) ^ bit_mask;
 			}
-
 			all_zero = all_zero && (this_weight == 0);
 
 			rp_weights.push_back(this_weight);
-			sum_rp_weights += this_weight;
+			sum_rp_weights = (sum_rp_weights + this_weight) ^ bit_mask;
 		}
 
 		if(all_zero) {
-			sum_rp_weights = 0;
-			for(unsigned int j = 0; j < rp_weights.size(); ++j) {
-				rp_weights[j] = 1;
-				sum_rp_weights += rp_weights[j];
-			}
+			std::cerr << "All rp weights are 0" << std::endl;
+			exit(1);
 		}
 
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
@@ -628,10 +636,22 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 			} else if(utils::unit_type == utils::UnitType::DB) {
 
 				// Numerical calculates the log_10 of rp_weights[j] / sum_rp_weights.
-				llong ratio = (((factor_int * rp_weights[j]) ^ bit_mask) / sum_rp_weights) ^ bit_mask;
+				llong this_ratio_scale = 1;
+				llong num = (((factor_int * rp_weights[j]) ^ bit_mask) * this_ratio_scale) ^ bit_mask;
+				llong ratio = (num / sum_rp_weights) ^ bit_mask;
+				llong num_limit = (llong(1) << (sm_params->bit_count - 4)) / 16;
+				while(num < num_limit && ratio < llong(ratio_thresh * sm_params->factor)) {
+					this_ratio_scale *= llong(16);
+					num = (((factor_int * rp_weights[j]) ^ bit_mask) * this_ratio_scale) ^ bit_mask;
+					ratio =  (num / sum_rp_weights) ^ bit_mask;
+				}
+
+				if(ratio == 0) {
+					ratio = 1;
+				}
 
 				float rv = utils::randomFloat(0.5, 2.0);
-				float log_ratio_float = log10(rv * float(ratio) / sm_params->factor) - log10(rv);
+				float log_ratio_float = log10(rv * float(ratio) / sm_params->factor) - log10(rv) - log10(this_ratio_scale);
 				llong log_ratio = llong(log_ratio_float * sm_params->factor) ^ bit_mask;
 
 				this_rp = (((10 * log_ratio) ^ bit_mask) + (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask;
@@ -1032,6 +1052,7 @@ float SpectrumManager::secureRadar(
 	PWID("selecting SS");
 	std::vector<int> sss_inds;
 	std::vector<sInt> secret_sss_dists;
+
 	if(sm_params->selection_algo == SMParams::SelectionAlgo::NONE ||
 			sm_params->selection_algo == SMParams::SelectionAlgo::RANDOM) {
 		for(unsigned int i = 0; i < k_ss; ++i) {
@@ -1046,7 +1067,6 @@ float SpectrumManager::secureRadar(
 				dist_to_pl_alpha = dist_to_pl_alpha * dist;
 			} else if(sm_params->pl_alpha == 2) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
-
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared;
 			} else if(sm_params->pl_alpha == 3) {
 				sInt dist;
@@ -1140,13 +1160,16 @@ float SpectrumManager::secureRadar(
 	// w = (1 / d(SU, SS))
 	std::vector<sInt> sss_w;
 	sInt sum_weight = INPUT(parties, 0, 0, sm_params->bit_count);
+
+	llong dist_scale = 1 << 16;
+	sInt secure_dist_scale = INPUT(parties, 0, dist_scale, sm_params->bit_count);
 	for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 		PWID("computing SS weight " + std::to_string(x));
 
 		// Check if dist is small
 		sInt is_dist_small = secret_sss_dists[x] <= one;
 
-		sss_w.push_back(is_dist_small.ifelse(large, factor_int * factor_int / secret_sss_dists[x]));
+		sss_w.push_back(is_dist_small.ifelse(large, secure_dist_scale * factor_int * factor_int / secret_sss_dists[x]));
 		sum_weight = sum_weight + sss_w[x];
 	}
 
@@ -1158,6 +1181,11 @@ float SpectrumManager::secureRadar(
 	sInt pl_est_gamma = INPUT(parties, 0, int(sm_params->pl_est_gamma * sm_params->factor), sm_params->bit_count);
 	sInt two_int = INPUT(parties, 0, 2, sm_params->bit_count);
 	std::vector<std::vector<sInt> > path_loss_su_pr; // path_loss_su_pr[i][j] is the path loss between the su and PU i's PR j.
+	
+	int dr_scale = 256;
+	float log_dr_scale = log10(dr_scale);
+	sInt secure_dr_scale = INPUT(parties, 0, dr_scale, sm_params->bit_count);
+	sInt secure_log_dr_scale = INPUT(parties, 0, int(log_dr_scale * sm_params->factor), sm_params->bit_count);
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
 		PWID("tp PU " + std::to_string(y));
 		unsigned int j = pu_inds[y];
@@ -1168,6 +1196,7 @@ float SpectrumManager::secureRadar(
 		for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 			PWID("tp SS (" + std::to_string(y) + ", " + std::to_string(x) + ")");
 			unsigned int i = sss_inds[x];
+
 			if(utils::unit_type == utils::UnitType::ABS) {
 				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * sss_rp_from_pu[i][j] / pus_tp[j];
 			} else if(utils::unit_type == utils::UnitType::DB) {
@@ -1180,8 +1209,6 @@ float SpectrumManager::secureRadar(
  
 		sInt pu_est_path_loss = factor_int * sum_weighted_ratio / sum_weight;
 
-		// PRINT("PU PL " + std::to_string(y) + ":", pu_est_path_loss);
-
 		sInt pu_x_diff = su_x - pus_x[j];
 		sInt pu_y_diff = su_y - pus_y[j];
 		sInt su_pu_dist_squared = (pu_x_diff * pu_x_diff + pu_y_diff * pu_y_diff) / factor_int;
@@ -1192,11 +1219,11 @@ float SpectrumManager::secureRadar(
 			sInt pr_y_diff = su_y - prs_y[j][x];
 			sInt su_pr_dist_squared = (pr_x_diff * pr_x_diff + pr_y_diff * pr_y_diff) / factor_int;
 
-			sInt dist_ratio = factor_int * su_pr_dist_squared / su_pu_dist_squared;
-		
+			sInt dist_ratio = secure_dr_scale * factor_int * su_pr_dist_squared / su_pu_dist_squared;
+
 			sInt log_dist_ratio;
 			utils::secureLog10_v2(&log_dist_ratio, dist_ratio, parties, sm_params->bit_count, sm_params->factor, factor_int);
-			sInt pr_est_path_loss = pu_est_path_loss + ten * pl_est_gamma * log_dist_ratio / factor_int;
+			sInt pr_est_path_loss = pu_est_path_loss + ten * pl_est_gamma * (log_dist_ratio - secure_log_dr_scale) / two / factor_int;
 
 			sInt this_su_tp;
 			if(utils::unit_type == utils::UnitType::ABS) {
@@ -1209,7 +1236,6 @@ float SpectrumManager::secureRadar(
 				exit(1);
 			}
 			path_loss_su_pr[j].push_back(pr_est_path_loss + zero);
-
 
 			if(y == 0 && x == 0) {
 				su_tp = this_su_tp + zero;
@@ -1254,8 +1280,8 @@ float SpectrumManager::secureRadar(
 	// |  Update PR thresholds  |
 	// |------------------------|
 	PWID("update PR thresholds");
-	sInt actual_su_tp_a = INPUT(parties, 0, int(actual_su_tp_pt * sm_params->factor), sm_params->bit_count);
-	sInt actual_su_tp_b = INPUT(parties, 1, int(actual_su_tp_pt * sm_params->factor), sm_params->bit_count);
+	sInt actual_su_tp_a = INPUT(parties, 0, actual_su_tp_pt, sm_params->bit_count);
+	sInt actual_su_tp_b = INPUT(parties, 1, actual_su_tp_pt, sm_params->bit_count);
 	sInt actual_su_tp = actual_su_tp_a + actual_su_tp_b;
 
 	// is_su_transmitting
@@ -1274,7 +1300,7 @@ float SpectrumManager::secureRadar(
 			PWID("update PR (" + std::to_string(y) + ", " + std::to_string(x) + ")");
 
 			// Calculate the update to the PR thresh: u = 10 * log_10(1.0 - 10 ^ ((rp - thresh) / 10))
-			sInt diff_dbm = (actual_su_tp + path_loss_su_pr[j][x])/* - prs_thresh[j][x]*/;
+			sInt diff_dbm = (actual_su_tp + path_loss_su_pr[j][x]) - prs_thresh[j][x];
 			sInt diff_div_ten = diff_dbm / ten;
 
 			sInt ten_to_diff;
@@ -1302,7 +1328,6 @@ float SpectrumManager::secureRadar(
 		}
 	}
 	secureTableWrite(parties, pu_table, updates, sm_ch);
-	
 	return max_su_tp;
 }
 
@@ -1519,9 +1544,13 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 	}
 }
 
-void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table) {
+void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
+	en_timers["total"].start("sendEncryptedData");
+
 	// SU
+	en_timers["entities"].start("SU");
 	sm_ch->send(su.getValues());
+	en_timers["entities"].end("SU");
 
 	// Grid Table - SS
 	sm_ch->send(std::array<int, 1>{int(grid_table.sss.size())});
@@ -1537,7 +1566,9 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 		sm_ch->send(std::array<int, 1>{int(ss_itr->second.size())});
 
 		for(unsigned int j = 0; j < ss_itr->second.size(); ++j) {
+			en_timers["entities"].start("SS");
 			sm_ch->send(ss_itr->second[j].getValues());
+			en_timers["entities"].end("SS");
 		}
 	}
 
@@ -1552,7 +1583,9 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 			exit(1);
 		}
 
+		en_timers["entities"].start("PU inds");
 		sm_ch->send(pu_ref_itr->second);
+		en_timers["entities"].end("PU inds");
 	}
 
 	// PU Table
@@ -1565,7 +1598,9 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 			exit(1);
 		}
 
+		en_timers["entities"].start("PU");
 		sm_ch->send(pu_itr->second.getValues());
+		en_timers["entities"].end("PU");
 
 		if(int(pu_itr->second.prs.size()) != pu_table.num_pr_per_pu) {
 			std::cerr << "Invalid num pr: " <<  pu_itr->second.prs.size() << ", " << pu_table.num_pr_per_pu << std::endl;
@@ -1573,17 +1608,25 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 		}
 
 		for(unsigned int j = 0; j < pu_itr->second.prs.size(); ++j) {
+			en_timers["entities"].start("PR");
 			sm_ch->send(pu_itr->second.prs[j].getValues());
+			en_timers["entities"].end("PR");
 		}
 	}
+
+	en_timers["total"].end("sendEncryptedData");
 }
 
-void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table) {
+void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
 	std::vector<int> vals;
 
+	en_timers["total"].start("recvEncryptedData-recv");
+
 	// SU
+	en_timers["entities"].start("SU");
 	sm_ch->recv(vals);
 	su->setValues(vals);
+	en_timers["entities"].end("SU");
 
 	// Grid Table - SS
 	std::array<int, 1> gt_ss_c;
@@ -1598,8 +1641,10 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 		std::vector<SSint> this_entry(gt_ss_entry_size);
 		for(int j = 0; j < gt_ss_entry_size; ++j) {
 			vals.clear();
+			en_timers["entities"].start("SS");
 			sm_ch->recv(vals);
 			this_entry[j].setValues(vals);
+			en_timers["entities"].end("SS");
 		}
 
 		grid_table->sss[i] = this_entry;
@@ -1612,9 +1657,11 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 
 	for(int i = 0; i < gt_pu_ref_entries; ++i) {
 		vals.clear();
-		sm_ch->recv(vals);
 
+		en_timers["entities"].start("PU inds");
+		sm_ch->recv(vals);
 		grid_table->pu_refs[i] = vals;
+		en_timers["entities"].end("PU inds");
 	}
 
 	// PU Table
@@ -1627,72 +1674,129 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 
 	for(int i = 0; i < put_entries; ++i) {
 		vals.clear();
+
+		en_timers["entities"].start("PU");
 		sm_ch->recv(vals);
 		pu_table->pus[i].setValues(vals);
+		en_timers["entities"].end("PU");
 
 		std::vector<PRint> this_prs(put_npr);
 		for(int j = 0; j < put_npr; ++j) {
 			vals.clear();
+
+			en_timers["entities"].start("PR");
 			sm_ch->recv(vals);
 			this_prs[j].setValues(vals);
+			en_timers["entities"].end("PR");
 		}
 		pu_table->pus[i].prs = this_prs;
 	}
 
+	en_timers["total"].end("recvEncryptedData-recv");
+
 	// Decrypt Data
+	en_timers["total"].start("recvEncryptedData-decrypt");
+	
 	// SU
+	en_timers["entities"].start("SU-decrypt");
 	key_server->decrypt(su);
+	en_timers["entities"].end("SU-decrypt");
 
 	// SS
 	for(auto ss_itr = grid_table->sss.begin(); ss_itr != grid_table->sss.end(); ++ss_itr) {
 		for(unsigned int i = 0; i < ss_itr->second.size(); ++i) {
+			en_timers["entities"].start("SS-decrypt");
 			key_server->decrypt(&(ss_itr->second[i]));
+			en_timers["entities"].end("SS-decrypt");
 		}
 	}
 
 	// PU
 	for(auto pu_itr = pu_table->pus.begin(); pu_itr != pu_table->pus.end(); ++pu_itr) {
+		en_timers["entities"].start("PU-decrypt");
 		key_server->decrypt(&(pu_itr->second));
+		en_timers["entities"].end("PU-decrypt");
 
 		// PR
 		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
+			en_timers["entities"].start("PR-decrypt");
 			key_server->decrypt(&(pu_itr->second.prs[i]));
+			en_timers["entities"].end("PR-decrypt");
 		}
 	}
+	en_timers["total"].end("recvEncryptedData-decrypt");
 }
 
-void SpectrumManager::sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table) {
+void SpectrumManager::sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
+	en_timers["total"].start("sendEncryptedPRThresholds");
 	for(auto pu_itr = pu_table.pus.begin(); pu_itr != pu_table.pus.end(); ++pu_itr) {
 		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
 			// Encrypt just the PR thresholds
+			en_timers["entities"].start("PR thresh-encrypt");
 			int v = key_server->encryptPRThreshold(pu_itr->second.prs[i]);
+			en_timers["entities"].end("PR thresh-encrypt");
 
 			// Send the encrypted threshold back to the SM
 			std::array<int, 1> thresh_val{v};
+
+			en_timers["entities"].start("PR thresh");
 			sm_ch->send(thresh_val);
+			en_timers["entities"].end("PR thresh");
 		}
 	}
+	en_timers["total"].end("sendEncryptedPRThresholds");
 }
 
-void SpectrumManager::recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table) {
+void SpectrumManager::recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
+	en_timers["total"].start("recvEncryptedPRThresholds");
 	for(auto pu_itr = pu_table->pus.begin(); pu_itr != pu_table->pus.end(); ++pu_itr) {
 		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
 			// Recv the new PR threshold
 			std::array<int, 1> thresh_val;
+
+			en_timers["entities"].start("PR thresh");
 			sm_ch->recv(thresh_val);
 
 			// Update the pu_table
 			pu_itr->second.prs[i].threshold = thresh_val[0];
+			en_timers["entities"].end("PR thresh");
 		}
 	}
+	en_timers["total"].end("recvEncryptedPRThresholds");
 }
 
 std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table) const {
 	P("start PlaintextSpectrumManager::plainTextRun");
 	std::vector<PU> pus = input_pus;
 
+	// Compute the share of received power for each
+	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
+	std::vector<std::vector<float> > received_powers;
+	for(unsigned int i = 0; i < sss.size(); ++i) {
+		std::vector<float> rp_weights;
+		float sum_rp_weights = 0.0;
+		for(unsigned int j = 0; j < pus.size(); ++j) {
+			rp_weights.push_back(1.0 / pow(sss[i].loc.dist(pus[j].loc), sm_params->rp_alpha));
+			sum_rp_weights += rp_weights[j];
+		}
+
+		received_powers.push_back(std::vector<float>());
+
+		for(unsigned int j = 0; j < pus.size(); ++j) {
+			if(utils::unit_type == utils::UnitType::ABS) {
+				received_powers[i].push_back(rp_weights[j] * sss[i].received_power / sum_rp_weights);
+			} else if(utils::unit_type == utils::UnitType::DB) {
+				received_powers[i].push_back(utils::todBm(rp_weights[j] / sum_rp_weights) + sss[i].received_power);
+			} else {
+				std::cerr << "Unsupported unit_type" << std::endl;
+				exit(1);
+			}
+		}
+	}
+
 	std::map<int, std::vector<PU*> > pu_groups;
 	std::map<int, std::vector<const SS*> > ss_groups;
+	std::map<int, std::vector<std::vector<float> > > rp_powers_groups;
 	if(sm_params->use_grid) {
 		std::map<int, std::vector<int> > pu_int_groups;
 		std::map<int, std::vector<int> > ss_int_groups;
@@ -1707,12 +1811,28 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 		for(auto itr = ss_int_groups.begin(); itr != ss_int_groups.end(); ++itr) {
 			for(unsigned int i = 0; i < itr->second.size(); ++i) {
 				ss_groups[itr->first].push_back(&(sss[itr->second[i]]));
+
+				rp_powers_groups[itr->first].push_back(std::vector<float>());
+
+				auto pu_itr = pu_int_groups.find(itr->first);
+				if(pu_itr == pu_int_groups.end()) {
+					std::cerr << "Error with rp and groups in PT" << std::endl;
+					exit(1);
+				}
+
+				for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
+					rp_powers_groups[itr->first][i].push_back(received_powers[itr->second[i]][pu_itr->second[j]]);
+				}
 			}
 		}
+	} else {
+		std::cerr << "Not using grid is not supported" << std::endl;
+		exit(1);
 	}
 
 	std::vector<PU*> sel_pus;
 	std::vector<const SS*> sel_sss;
+	std::vector<std::vector<float> > this_rps;
 	if(!sm_params->use_grid) {
 		for(unsigned int j = 0; j < pus.size(); ++j) {
 			sel_pus.push_back(&pus[j]);
@@ -1724,6 +1844,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	}
 	std::vector<float> all_vals;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
+		std::cout << "Starting PT request for SU " << i << std::endl;
 		if(sm_params->use_grid) {
 			sel_pus.clear();
 			sel_sss.clear();
@@ -1745,9 +1866,18 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 			}
 
 			sel_sss = ss_itr->second;
+
+			auto rp_itr = rp_powers_groups.find(group_id);
+			if(rp_itr == rp_powers_groups.end()) {
+				std::cerr << "Invalid group_id: " << group_id << std::endl;
+				exit(1);
+			}
+
+			this_rps = rp_itr->second;
 		}
-		float v = plainTextRadar(sus[i], sel_pus, sel_sss, path_loss_table);
+		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table);
 		all_vals.push_back(v);
+		std::cout << "Finished PT request for SU " << i << std::endl;
 	}
 
 	P("end PlaintextSpectrumManager::plainTextRun");
@@ -1816,7 +1946,7 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<PU>& pus, const s
 }
 
 float PlaintextSpectrumManager::plainTextRadar(
-		const SU& su, std::vector<PU*>& pus, const std::vector<const SS*>& sss, PathLossTable* path_loss_table) const {
+		const SU& su, std::vector<PU*>& pus, const std::vector<const SS*>& sss, const std::vector<std::vector<float> >& received_powers, PathLossTable* path_loss_table) const {
 	// PU selection.
 	std::vector<int> pu_inds;
 	unsigned int k_pu = numSelect(sm_params->num_pu_selection, pus.size());
@@ -1919,31 +2049,6 @@ float PlaintextSpectrumManager::plainTextRadar(
 		weights.push_back(w);
 		tmp_sum_weight += w;
 	}
-
-	// Compute the share of received power for each
-	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
-	std::vector<std::vector<float> > received_powers;
-	for(unsigned int i = 0; i < sss.size(); ++i) {
-		std::vector<float> rp_weights;
-		float sum_rp_weights = 0.0;
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			rp_weights.push_back(1.0 / pow(sss[i]->loc.dist(pus[j]->loc), sm_params->rp_alpha));
-			sum_rp_weights += rp_weights[j];
-		}
-
-		received_powers.push_back(std::vector<float>());
-
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			if(utils::unit_type == utils::UnitType::ABS) {
-				received_powers[i].push_back(rp_weights[j] * sss[i]->received_power / sum_rp_weights);
-			} else if(utils::unit_type == utils::UnitType::DB) {
-				received_powers[i].push_back(utils::todBm(rp_weights[j] / sum_rp_weights) + sss[i]->received_power);
-			} else {
-				std::cerr << "Unsupported unit_type" << std::endl;
-				exit(1);
-			}
-		}
-	}
 	
 	// Compute SU transmit power
 	// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
@@ -1956,6 +2061,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 		float sum_weighted_ratio = 0.0;
 		for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 			int i = sss_inds[x];
+
 			sum_weight = sum_weight + weights[x];
 			if(utils::unit_type == utils::UnitType::ABS) {
 				sum_weighted_ratio = sum_weighted_ratio + weights[x] * received_powers[i][j] / pus[j]->transmit_power;
@@ -2005,7 +2111,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 				}
 				for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
 					float rp = actual_su_tp + estimated_path_loss[y][x];
-					
+
 					float new_value = utils::todBm(utils::fromdBm(pus[j]->prs[x].threshold) - utils::fromdBm(rp));
 					
 					pus[j]->prs[x].threshold = new_value;

@@ -6,6 +6,7 @@ import itertools
 from operator import mul
 from copy import deepcopy
 import math
+from collections import defaultdict
 
 import time
 
@@ -317,7 +318,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 			'splat_cmd': 'splat_cmd', 'ref_lat': 'ref_lat', 'ref_long': 'ref_long',
 			'splat_dir': 'splat_dir', 'sdf_dir': 'sdf_dir', 'return_dir': 'return_dir',
 			'num_ss_selection': 'nss_s', 'num_pu_selection': 'npu_s',
-			'do_plaintext_split': 'do_pt_split', 'no_pr_thresh_update': '-no_pr_up',
+			'do_plaintext_split': 'do_pt_split', 'no_pr_thresh_update': 'no_pr_up',
 			'selection_algo': 'sel_algo', 'secure_write_algo': 'sec_write_algo',
 			'grid_x': 'grid_x', 'grid_y': 'grid_y',
 			'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
@@ -506,10 +507,10 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
+			changes.append({NUM_SS_SELECTION: [1, 10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
 							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
-							'location_range': [100.0], 'num_ss': [100], 'num_su': [1], 'unit_type': ['db'],
+							'location_range': [100.0], 'num_ss': [100], 'num_su': [100], 'unit_type': ['db'],
 							'num_pr_per_pu': [5], 'pr_range': [10.0]})
 		if experiment == VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
@@ -525,9 +526,11 @@ if __name__ == '__main__':
 					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
+					# 'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
-					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks'])}
+					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks']),
+					'no_pr_thresh_update': [True]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
@@ -541,7 +544,7 @@ if __name__ == '__main__':
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_pu_s_test] # [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
@@ -589,11 +592,26 @@ if __name__ == '__main__':
 	if out_file == None:
 		out_file = current_time.strftime('data/out_%b-%d_%H:%M:%S_' + (args.name_of_experiment[0] if args.name_of_experiment[0] != None else '-'.join(experiments)) + '.txt')
 
+	all_changes = defaultdict(set)
+	for change in changes:
+		for n, vs in change.iteritems():
+			for v in vs:
+				all_changes[n].add(v)
+
+	print_vals = []
+	for k, vs in all_changes.iteritems():
+		if len(vs) > 1:
+			print_vals.append(k)
+	print_vals.sort()
+
 	for i in range(args.num_tests[0]):
 		for change in changes:
 			ns = change.keys()
 			for vs in itertools.product(*tuple(vs for k, vs in change.iteritems())):
-				print 'Running experiment', exp_num, 'of', num_experiments, 'with parameters:', ns, vs
+				print 'Running experiment', exp_num, 'of', num_experiments, 'with parameters:'
+				for pv in print_vals:
+					pv_ind = ns.index(pv)
+					print pv, '->', vs[pv_ind]
 				
 				param = makeDefaultExperimentParam()
 

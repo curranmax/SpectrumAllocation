@@ -23,6 +23,8 @@
 #include <sstream>
 #include <algorithm>
 
+#define PDIF(prefix, v1, v2, pdif_limit) {if(fabs(v1 - v2) / fabs(v1) >= pdif_limit) { std::cout << prefix << " " << v1 << ", " << v2 << ", " << fabs(v1 - v2) / fabs(v1) << std::endl; }}
+
 int main(int argc, char const *argv[]) {
 	Args args(argc, argv);
 
@@ -102,6 +104,7 @@ int main(int argc, char const *argv[]) {
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
 	Timer t1, secure_write_timer;
+	std::map<std::string, Timer> sm_timers, ks_timers;
 	if(!args.skip_s2pc) {
 		// "Split values"
 		// PU
@@ -198,7 +201,7 @@ int main(int argc, char const *argv[]) {
 				SM sm(party_id, &sm_params, pus_int0, sss_int0, sus_int0, pus_int1, sss_int1, sus_int1);
 				sm.setSecureWriteTimer(&secure_write_timer);
 				
-				secure_vs_a = sm.runSM(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
+				secure_vs_a = sm.runSM(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1, sm_timers);
 			}
 		});
 
@@ -211,7 +214,7 @@ int main(int argc, char const *argv[]) {
 			} else if(args.central_entities == "sm_ks") {
 				SM sm(party_id, &sm_params, &ks); // Probably size information
 
-				secure_vs_b = sm.runKS(int(sus_int1.size()));
+				secure_vs_b = sm.runKS(int(sus_int1.size()), ks_timers);
 			}
 		});
 
@@ -300,6 +303,74 @@ int main(int argc, char const *argv[]) {
 			std::cout << "Average duration of " << Timer::secure_su_request << ": " << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 			std::cout << "Average duration of " << Timer::secure_write << ": " << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
 		}
+	}
+
+	if(!args.skip_s2pc && args.central_entities == "sm_ks") {
+		// SM - "total"
+		auto sm_total = sm_timers["total"];
+		std::cout << "sendEncryptedData|float|" << sm_total.getAverageDuration("sendEncryptedData") << std::endl;
+		std::cout << "recvEncryptedPRThresholds|float|" << sm_total.getAverageDuration("recvEncryptedPRThresholds") << std::endl;
+	
+		// KS - "total"
+		auto ks_total = ks_timers["total"];
+		std::cout << "recvEncryptedData_recv|float|" << ks_total.getAverageDuration("recvEncryptedData-recv") << std::endl;
+		std::cout << "recvEncryptedData_decrypt|float|" << ks_total.getAverageDuration("recvEncryptedData-decrypt") << std::endl;
+		std::cout << "sendEncryptedPRThresholds|float|" << ks_total.getAverageDuration("sendEncryptedPRThresholds") << std::endl;
+
+		// SM - "entities"
+		auto sm_entity = sm_timers["entities"];
+		std::cout << "send_SU|float|" << sm_entity.getAverageDuration("SU") << std::endl;
+		std::cout << "send_SU_num|float|" << sm_entity.numDurations("SU") << std::endl;
+
+		std::cout << "send_SS|float|" << sm_entity.getAverageDuration("SS") << std::endl;
+		std::cout << "send_SS_num|float|" << sm_entity.numDurations("SS") << std::endl;
+
+		std::cout << "send_PU_inds|float|" << sm_entity.getAverageDuration("PU inds") << std::endl;
+		std::cout << "send_PU_inds_num|float|" << sm_entity.numDurations("PU inds") << std::endl;
+
+		std::cout << "send_PU|float|" << sm_entity.getAverageDuration("PU") << std::endl;
+		std::cout << "send_PU_num|float|" << sm_entity.numDurations("PU") << std::endl;
+
+		std::cout << "send_PR|float|" << sm_entity.getAverageDuration("PR") << std::endl;
+		std::cout << "send_PR_num|float|" << sm_entity.numDurations("PR") << std::endl;
+
+		std::cout << "recv_PR_thresh|float|" << sm_entity.getAverageDuration("PR thresh") << std::endl;
+		std::cout << "recv_PR_thresh_num|float|" << sm_entity.numDurations("PR thresh") << std::endl;
+
+		// KS - "entities"
+		auto ks_entity = ks_timers["entities"];
+		std::cout << "recv_SU|float|" << ks_entity.getAverageDuration("SU") << std::endl;
+		std::cout << "recv_SU_num|float|" << ks_entity.numDurations("SU") << std::endl;
+
+		std::cout << "recv_SS|float|" << ks_entity.getAverageDuration("SS") << std::endl;
+		std::cout << "recv_SS_num|float|" << ks_entity.numDurations("SS") << std::endl;
+
+		std::cout << "recv_PU_inds|float|" << ks_entity.getAverageDuration("PU inds") << std::endl;
+		std::cout << "recv_PU_inds_num|float|" << ks_entity.numDurations("PU inds") << std::endl;
+
+		std::cout << "recv_PU|float|" << ks_entity.getAverageDuration("PU") << std::endl;
+		std::cout << "recv_PU_num|float|" << ks_entity.numDurations("PU") << std::endl;
+
+		std::cout << "recv_PR|float|" << ks_entity.getAverageDuration("PR") << std::endl;
+		std::cout << "recv_PR_num|float|" << ks_entity.numDurations("PR") << std::endl;
+
+		std::cout << "decrypt_SU|float|" << ks_entity.getAverageDuration("SU-decrypt") << std::endl;
+		std::cout << "decrypt_SU_num|float|" << ks_entity.numDurations("SU-decrypt") << std::endl;
+
+		std::cout << "decrypt_SS|float|" << ks_entity.getAverageDuration("SS-decrypt") << std::endl;
+		std::cout << "decrypt_SS_num|float|" << ks_entity.numDurations("SS-decrypt") << std::endl;
+
+		std::cout << "decrypt_PU|float|" << ks_entity.getAverageDuration("PU-decrypt") << std::endl;
+		std::cout << "decrypt_PU_num|float|" << ks_entity.numDurations("PU-decrypt") << std::endl;
+
+		std::cout << "decrypt_PR|float|" << ks_entity.getAverageDuration("PR-decrypt") << std::endl;
+		std::cout << "decrypt_PR_num|float|" << ks_entity.numDurations("PR-decrypt") << std::endl;
+
+		std::cout << "encrypt_PR_thresh|float|" << ks_entity.getAverageDuration("PR thresh-encrypt") << std::endl;
+		std::cout << "encrypt_PR_thresh_num|float|" << ks_entity.numDurations("PR thresh-encrypt") << std::endl;
+
+		std::cout << "send_PR_thresh|float|" << ks_entity.getAverageDuration("PR thresh") << std::endl;
+		std::cout << "send_PR_thresh_num|float|" << ks_entity.numDurations("PR thresh") << std::endl;
 	}
 
 	return 0;

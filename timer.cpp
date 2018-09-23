@@ -56,3 +56,12 @@ float Timer::getAverageDuration(const std::string& tag) const {
 	}
 	return sum_durs / num_durs;
 }
+
+int Timer::numDurations(const std::string& tag) const {
+	auto itr = durations.find(tag);
+	if(itr == durations.cend()) {
+		return 0;
+	}
+
+	return itr->second.size();
+}

@@ -5,8 +5,8 @@
 #include <chrono>
 #include <string>
 
-#define P(msg) {} // debug::print(__FILE__, __LINE__, msg)
-#define PWID(msg) {}// debug::print(__FILE__, __LINE__, party_id, msg) 
+#define P(msg) {} //debug::print(__FILE__, __LINE__, msg)
+#define PWID(msg) {} //debug::print(__FILE__, __LINE__, party_id, msg) 
 
 namespace debug {
 

@@ -17,6 +17,8 @@ public:
 
 	virtual float getAverageDuration(const std::string& tag) const;
 
+	virtual int numDurations(const std::string& tag) const;
+
 	static const std::string secure_preprocessing;
 	static const std::string secure_su_request;
 
@@ -39,6 +41,7 @@ public:
 	void end(const std::string& tag) {}
 
 	float getAverageDuration(const std::string& tag) const { return 0.0; }
+	int numDurations(const std::string& tag) const { return 0; }
 };
 
 #endif
