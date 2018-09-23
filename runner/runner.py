@@ -19,6 +19,8 @@ FULL_TEST_TWO_SMS = 'full_test-two_sms'
 FULL_TEST_SM_KS = 'full_test-sm_ks'
 PATH_LOSS_TEST = 'path_loss_test'
 
+KS_TIMING = 'ks_timing'
+
 MED_TEST = 'med_test'
 LARGE_TEST = 'large_test'
 
@@ -28,7 +30,7 @@ OUTPUT_RUN = 'output'
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
-						PATH_LOSS_TEST, MED_TEST, LARGE_TEST,
+						PATH_LOSS_TEST, KS_TIMING, MED_TEST, LARGE_TEST,
 						TEST_OUTPUT, OUTPUT_RUN]
 
 # Change parameters
@@ -530,7 +532,7 @@ if __name__ == '__main__':
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks']),
-					'no_pr_thresh_update': [True]}
+					'no_pr_thresh_update': [False]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
@@ -552,6 +554,15 @@ if __name__ == '__main__':
 							'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
 							PL_ALPHA: [1, 2], RP_ALPHA: [1, 2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db', 'abs'],
 							'skip_s2pc': [True]})
+		
+		if experiment == KS_TIMING:
+			changes.append({NUM_SS_SELECTION: [1, 10, 25], 'num_pu_selection': [1, 10, 25],
+							('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
+							'num_pr_per_pu' : [5], 'pr_range': [100.0],
+							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+							'num_pu': [400], 'num_ss': [4000], 'num_su': [2],
+							'central_entities': ['sm_ks']})
+
 		if experiment == MED_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], 'num_pu_selection': [1, 5, 10],
 							('num_pu', 'num_ss', 'location_range', 'grid_x', 'grid_y'):
