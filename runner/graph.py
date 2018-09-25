@@ -328,7 +328,9 @@ if __name__ == '__main__':
 	# Y values
 	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'), ('secure_write_time', 'swt'),
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
-				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db')]
+				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
+				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
+				('recvEncryptedData_recv', 'red_r'), ('recvEncryptedData_decrypt', 'red_d'), ('sendEncryptedPRThresholds', 'sepr')]
 	for full_yv, short_yv in y_values:
 		parser.add_argument('-y_' + short_yv, '--use_' + full_yv + '_for_y_value', action = 'store_true', help = 'If given, uses ' + full_yv + ' for the y dimension.')
 

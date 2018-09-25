@@ -38,6 +38,66 @@ int main(int argc, char const *argv[]) {
 	} else {
 		std::cout << "Using random seed: " << rs << std::endl;
 	}
+
+	// {
+	// 	// Test Shared.h
+	// 	Shared shared;
+
+	// 	std::thread thrd1([&]() {
+	// 		Socket s1("127.0.0.1", 8081);
+	// 		bool connected = s1.listenFor();
+	// 		if(connected) {
+	// 			std::cout << "s1 is connected" << std::endl;
+	// 		} else {
+	// 			std::cout << "s1 is not connected" << std::endl;
+	// 		}
+
+	// 		std::vector<int> vs1, vs2;
+	// 		std::vector<float> vs3;
+	// 		for(unsigned int i = 0; i < 100; ++i) {
+	// 			vs1.push_back(i + 1);
+	// 			vs2.push_back(100 - i);
+	// 			vs3.push_back(float(i) / 2);
+	// 		}
+
+	// 		shared.set(vs1);
+	// 		shared.set(vs2);
+	// 		shared.set(vs3);
+	// 	});
+
+	// 	std::thread thrd2([&]() {
+	// 		sleep(5);
+	// 		Socket s2("127.0.0.1", 8081);
+	// 		bool connected = s2.connectTo();
+	// 		if(connected) {
+	// 			std::cout << "s2 is connected" << std::endl;
+	// 		} else {
+	// 			std::cout << "s2 is not connected" << std::endl;
+	// 		}
+
+	// 		sleep(5);
+
+	// 		std::vector<int> vs1, vs2;
+	// 		std::vector<float> vs3;
+	// 		shared.get(vs1);
+	// 		shared.get(vs2);
+	// 		shared.get(vs3);
+
+	// 		std::cout << "vs1[0] = " << vs1[0] << std::endl;
+	// 		std::cout << "vs1[" << vs1.size() - 1 << "] = " << vs1[vs1.size() - 1] << std::endl;
+
+	// 		std::cout << "vs2[0] = " << vs2[0] << std::endl;
+	// 		std::cout << "vs2[" << vs2.size() - 1 << "] = " << vs2[vs2.size() - 1] << std::endl;
+
+	// 		std::cout << "vs3[0] = " << vs3[0] << std::endl;
+	// 		std::cout << "vs3[" << vs3.size() - 1 << "] = " << vs3[vs3.size() - 1] << std::endl;
+	// 	});
+
+	// 	thrd1.join();
+	// 	thrd2.join();
+
+	// 	exit(0);
+	// }
 	
 	utils::setUnitType(args.unit_type);
 
@@ -190,6 +250,8 @@ int main(int argc, char const *argv[]) {
 		const std::string channel_name = "sm-to-sm_channel";
 		sm_params.setCommunicationValues(num_io_threads, server_addr, connection_name, channel_name);
 
+		Shared shared_memory;
+
 		std::thread thrd0([&]() {
 			int party_id = 0;
 			if(args.central_entities == "two_sms") {
@@ -198,7 +260,7 @@ int main(int argc, char const *argv[]) {
 	
 				secure_vs_a = sm.run(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1);
 			} else if(args.central_entities == "sm_ks") {
-				SM sm(party_id, &sm_params, pus_int0, sss_int0, sus_int0, pus_int1, sss_int1, sus_int1);
+				SM sm(party_id, &sm_params, pus_int0, sss_int0, sus_int0, pus_int1, sss_int1, sus_int1, &shared_memory);
 				sm.setSecureWriteTimer(&secure_write_timer);
 				
 				secure_vs_a = sm.runSM(precomputed_pu_int_groups, precomputed_ss_int_groups, &t1, sm_timers);
@@ -212,7 +274,7 @@ int main(int argc, char const *argv[]) {
 	
 				secure_vs_b = sm.run(precomputed_pu_int_groups, precomputed_ss_int_groups, &null_timer);
 			} else if(args.central_entities == "sm_ks") {
-				SM sm(party_id, &sm_params, &ks); // Probably size information
+				SM sm(party_id, &sm_params, &ks, &shared_memory);
 
 				secure_vs_b = sm.runKS(int(sus_int1.size()), ks_timers);
 			}

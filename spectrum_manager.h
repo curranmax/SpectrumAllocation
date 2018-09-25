@@ -8,6 +8,7 @@
 #include "path_loss_table.h"
 #include "primary_user.h"
 #include "secondary_user.h"
+#include "shared.h"
 #include "spectrum_sensor.h"
 #include "tables.h"
 #include "timer.h"
@@ -108,14 +109,14 @@ public:
 	SpectrumManager(const SpectrumManager& sm) = delete;
 	
 	SpectrumManager(int _party_id, const SMParams* _sm_params, const std::vector<PUint>& _pus, const std::vector<SSint>& _sss, const std::vector<SUint>& _sus)
-			: party_id(_party_id), sm_params(_sm_params), all_pus(_pus), all_sss(_sss), all_sus(_sus), secure_write_timer(nullptr) {}
+			: party_id(_party_id), sm_params(_sm_params), all_pus(_pus), all_sss(_sss), all_sus(_sus), secure_write_timer(nullptr), shared_memory(nullptr) {}
 	
 	SpectrumManager(int _party_id, const SMParams* _sm_params, const std::vector<PUint>& _pus, const std::vector<SSint>& _sss, const std::vector<SUint>& _sus,
-					const std::vector<PUint>& _en_pus, const std::vector<SSint>& _en_sss, const std::vector<SUint>& _en_sus)
-			: party_id(_party_id), sm_params(_sm_params), all_pus(_pus), en_pus(_en_pus), all_sss(_sss), en_sss(_en_sss), all_sus(_sus), en_sus(_en_sus), secure_write_timer(nullptr) {}
+					const std::vector<PUint>& _en_pus, const std::vector<SSint>& _en_sss, const std::vector<SUint>& _en_sus, Shared* _shared_memory)
+			: party_id(_party_id), sm_params(_sm_params), all_pus(_pus), en_pus(_en_pus), all_sss(_sss), en_sss(_en_sss), all_sus(_sus), en_sus(_en_sus), secure_write_timer(nullptr), shared_memory(_shared_memory) {}
 	
-	SpectrumManager(int _party_id, const SMParams* _sm_params, KeyServer* _key_server)
-			: party_id(_party_id), sm_params(_sm_params), key_server(_key_server) {}
+	SpectrumManager(int _party_id, const SMParams* _sm_params, KeyServer* _key_server, Shared* _shared_memory)
+			: party_id(_party_id), sm_params(_sm_params), key_server(_key_server), shared_memory(_shared_memory) {}
 
 	void setSecureWriteTimer(Timer* _secure_write_timer) {
 		secure_write_timer = _secure_write_timer;
@@ -156,11 +157,11 @@ public:
 			const std::vector<std::pair<sInt, std::vector<sInt> > >& updates,
 			Channel* sm_ch) const;
 
-	void sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
-	void recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers);
+	void sendEncryptedData(const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
+	void recvEncryptedData(SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers);
 
-	void sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
-	void recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table, std::map<std::string, Timer>& en_timers);
+	void sendEncryptedPRThresholds(const PUTable& pu_table, std::map<std::string, Timer>& en_timers);
+	void recvEncryptedPRThresholds(PUTable* pu_table, std::map<std::string, Timer>& en_timers);
 
 	bool useGrid() const { return sm_params->use_grid; }
 private:
@@ -175,6 +176,8 @@ private:
 	KeyServer* key_server;
 
 	Timer* secure_write_timer;
+
+	Shared* shared_memory;
 };
 
 class PlaintextSpectrumManager {

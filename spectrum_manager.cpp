@@ -7,6 +7,7 @@
 #include "path_loss_table.h"
 #include "primary_user.h"
 #include "secondary_user.h"
+#include "shared.h"
 #include "spectrum_sensor.h"
 #include "split.h"
 #include "tables.h"
@@ -326,7 +327,7 @@ std::vector<float> SpectrumManager::runSM(
 		timer->start(Timer::secure_su_request);
 
 		// Send encrypted tables to KS
-		sendEncryptedData(&sm_ch, en_sus[i], en_grid_table, en_pu_table, en_timers);
+		sendEncryptedData(en_sus[i], en_grid_table, en_pu_table, en_timers);
 
 		if(sm_params->use_grid) {
 			selected_pus.clear();
@@ -338,7 +339,7 @@ std::vector<float> SpectrumManager::runSM(
 		float v = secureRadar(parties, all_sus[i], selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
 
 		// Get updated PR thresholds form KS
-		recvEncryptedPRThresholds(&sm_ch, &en_pu_table, en_timers);
+		recvEncryptedPRThresholds(&en_pu_table, en_timers);
 
 		timer->end(Timer::secure_su_request);
 
@@ -417,7 +418,7 @@ std::vector<float> SpectrumManager::runKS(int num_sus, std::map<std::string, Tim
 		}
 
 		// Send encrypted tables to KS
-		recvEncryptedData(&sm_ch, &su, &grid_table, &pu_table, en_timers);
+		recvEncryptedData(&su, &grid_table, &pu_table, en_timers);
 
 		if(sm_params->use_grid) {
 			selected_pus.clear();
@@ -429,7 +430,7 @@ std::vector<float> SpectrumManager::runKS(int num_sus, std::map<std::string, Tim
 		float v = secureRadar(parties, su, selected_pus, selected_sss, &pu_table, &sm_ch, &su_ch);
 
 		// Send updated PR thresholds form KS
-		sendEncryptedPRThresholds(&sm_ch, pu_table, en_timers);
+		sendEncryptedPRThresholds(pu_table, en_timers);
 
 		su_rps.push_back(v);
 
@@ -1544,16 +1545,17 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 	}
 }
 
-void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
+void SpectrumManager::sendEncryptedData(const SUint& su, const GridTable& grid_table, const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
 	en_timers["total"].start("sendEncryptedData");
 
 	// SU
 	en_timers["entities"].start("SU");
-	sm_ch->send(su.getValues());
+	shared_memory->set(su.getValues());
 	en_timers["entities"].end("SU");
 
 	// Grid Table - SS
-	sm_ch->send(std::array<int, 1>{int(grid_table.sss.size())});
+	std::vector<int> gt_ss_size = {int(grid_table.sss.size())};
+	shared_memory->set(gt_ss_size);
 
 	// Assume grid_table.sss keys go from 1 to n
 	for(unsigned int i = 0; i < grid_table.sss.size(); ++i) {
@@ -1563,17 +1565,17 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 			exit(1);
 		}
 
-		sm_ch->send(std::array<int, 1>{int(ss_itr->second.size())});
+		shared_memory->set(std::vector<int>{int(ss_itr->second.size())});
 
 		for(unsigned int j = 0; j < ss_itr->second.size(); ++j) {
 			en_timers["entities"].start("SS");
-			sm_ch->send(ss_itr->second[j].getValues());
+			shared_memory->set(ss_itr->second[j].getValues());
 			en_timers["entities"].end("SS");
 		}
 	}
 
 	// Grid Table - PU
-	sm_ch->send(std::array<int, 1>{int(grid_table.pu_refs.size())});
+	shared_memory->set(std::vector<int>{int(grid_table.pu_refs.size())});
 
 	// Assume grid_table.pu_ref keys go from 1 to n
 	for(unsigned int i = 0; i < grid_table.pu_refs.size(); ++i) {
@@ -1584,12 +1586,12 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 		}
 
 		en_timers["entities"].start("PU inds");
-		sm_ch->send(pu_ref_itr->second);
+		shared_memory->set(pu_ref_itr->second);
 		en_timers["entities"].end("PU inds");
 	}
 
 	// PU Table
-	sm_ch->send(std::array<int, 2>{int(pu_table.pus.size()), pu_table.num_pr_per_pu});
+	shared_memory->set(std::vector<int>{int(pu_table.pus.size()), pu_table.num_pr_per_pu});
 
 	for(unsigned int i = 0; i < pu_table.pus.size(); ++i) {
 		auto pu_itr = pu_table.pus.find(i);
@@ -1599,7 +1601,7 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 		}
 
 		en_timers["entities"].start("PU");
-		sm_ch->send(pu_itr->second.getValues());
+		shared_memory->set(pu_itr->second.getValues());
 		en_timers["entities"].end("PU");
 
 		if(int(pu_itr->second.prs.size()) != pu_table.num_pr_per_pu) {
@@ -1609,7 +1611,7 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 
 		for(unsigned int j = 0; j < pu_itr->second.prs.size(); ++j) {
 			en_timers["entities"].start("PR");
-			sm_ch->send(pu_itr->second.prs[j].getValues());
+			shared_memory->set(pu_itr->second.prs[j].getValues());
 			en_timers["entities"].end("PR");
 		}
 	}
@@ -1617,32 +1619,32 @@ void SpectrumManager::sendEncryptedData(Channel* sm_ch, const SUint& su, const G
 	en_timers["total"].end("sendEncryptedData");
 }
 
-void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
+void SpectrumManager::recvEncryptedData(SUint* su, GridTable* grid_table, PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
 	std::vector<int> vals;
 
 	en_timers["total"].start("recvEncryptedData-recv");
 
 	// SU
 	en_timers["entities"].start("SU");
-	sm_ch->recv(vals);
+	shared_memory->get(vals);
 	su->setValues(vals);
 	en_timers["entities"].end("SU");
 
 	// Grid Table - SS
-	std::array<int, 1> gt_ss_c;
-	sm_ch->recv(gt_ss_c);
+	std::vector<int> gt_ss_c;
+	shared_memory->get(gt_ss_c);
 	int gt_ss_entries = gt_ss_c[0];
 
 	for(int i = 0; i < gt_ss_entries; ++i) {
-		std::array<int, 1> gt_ss_entry_c;
-		sm_ch->recv(gt_ss_entry_c);
+		std::vector<int> gt_ss_entry_c;
+		shared_memory->get(gt_ss_entry_c);
 		int gt_ss_entry_size = gt_ss_entry_c[0];
 
 		std::vector<SSint> this_entry(gt_ss_entry_size);
 		for(int j = 0; j < gt_ss_entry_size; ++j) {
 			vals.clear();
 			en_timers["entities"].start("SS");
-			sm_ch->recv(vals);
+			shared_memory->get(vals);
 			this_entry[j].setValues(vals);
 			en_timers["entities"].end("SS");
 		}
@@ -1651,22 +1653,22 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 	}
 
 	// Grid Table - PU
-	std::array<int, 1> gt_pu_ref_c;
-	sm_ch->recv(gt_pu_ref_c);
+	std::vector<int> gt_pu_ref_c;
+	shared_memory->get(gt_pu_ref_c);
 	int gt_pu_ref_entries = gt_pu_ref_c[0];
 
 	for(int i = 0; i < gt_pu_ref_entries; ++i) {
 		vals.clear();
 
 		en_timers["entities"].start("PU inds");
-		sm_ch->recv(vals);
+		shared_memory->get(vals);
 		grid_table->pu_refs[i] = vals;
 		en_timers["entities"].end("PU inds");
 	}
 
 	// PU Table
-	std::array<int, 2> put_c;
-	sm_ch->recv(put_c);
+	std::vector<int> put_c;
+	shared_memory->get(put_c);
 	int put_entries = put_c[0];
 	int put_npr = put_c[1];
 
@@ -1676,7 +1678,7 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 		vals.clear();
 
 		en_timers["entities"].start("PU");
-		sm_ch->recv(vals);
+		shared_memory->get(vals);
 		pu_table->pus[i].setValues(vals);
 		en_timers["entities"].end("PU");
 
@@ -1685,7 +1687,7 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 			vals.clear();
 
 			en_timers["entities"].start("PR");
-			sm_ch->recv(vals);
+			shared_memory->get(vals);
 			this_prs[j].setValues(vals);
 			en_timers["entities"].end("PR");
 		}
@@ -1727,7 +1729,7 @@ void SpectrumManager::recvEncryptedData(Channel* sm_ch, SUint* su, GridTable* gr
 	en_timers["total"].end("recvEncryptedData-decrypt");
 }
 
-void SpectrumManager::sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
+void SpectrumManager::sendEncryptedPRThresholds(const PUTable& pu_table, std::map<std::string, Timer>& en_timers) {
 	en_timers["total"].start("sendEncryptedPRThresholds");
 	for(auto pu_itr = pu_table.pus.begin(); pu_itr != pu_table.pus.end(); ++pu_itr) {
 		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
@@ -1737,25 +1739,25 @@ void SpectrumManager::sendEncryptedPRThresholds(Channel* sm_ch, const PUTable& p
 			en_timers["entities"].end("PR thresh-encrypt");
 
 			// Send the encrypted threshold back to the SM
-			std::array<int, 1> thresh_val{v};
+			std::vector<int> thresh_val{v};
 
 			en_timers["entities"].start("PR thresh");
-			sm_ch->send(thresh_val);
+			shared_memory->set(thresh_val);
 			en_timers["entities"].end("PR thresh");
 		}
 	}
 	en_timers["total"].end("sendEncryptedPRThresholds");
 }
 
-void SpectrumManager::recvEncryptedPRThresholds(Channel* sm_ch, PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
+void SpectrumManager::recvEncryptedPRThresholds(PUTable* pu_table, std::map<std::string, Timer>& en_timers) {
 	en_timers["total"].start("recvEncryptedPRThresholds");
 	for(auto pu_itr = pu_table->pus.begin(); pu_itr != pu_table->pus.end(); ++pu_itr) {
 		for(unsigned int i = 0; i < pu_itr->second.prs.size(); ++i) {
 			// Recv the new PR threshold
-			std::array<int, 1> thresh_val;
+			std::vector<int> thresh_val;
 
 			en_timers["entities"].start("PR thresh");
-			sm_ch->recv(thresh_val);
+			shared_memory->get(thresh_val);
 
 			// Update the pu_table
 			pu_itr->second.prs[i].threshold = thresh_val[0];
