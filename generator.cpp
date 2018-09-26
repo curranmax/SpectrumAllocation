@@ -466,7 +466,7 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 
 	// Precomputes all path losses between PRs and SUs
 	for(unsigned int j = 0; j < pus.size(); ++j) {	
-		if(pus[j].prs.size() == 1 && pus[j].loc.dist(pus[j].prs[0].loc)) {
+		if(pus[j].prs.size() == 1 && pus[j].loc.dist(pus[j].prs[0].loc) < 0.001) {
 			pm->loadANOFile(pus[j]);
 			for(unsigned int i = 0; i < sus.size(); ++i) {
 				float v = 0.0;
@@ -496,7 +496,7 @@ std::vector<float> Generator::computeGroundTruth(const std::vector<SU>& sus, con
 						}
 						v = pr_pl_itr->second;
 					} else {
-						v = pm->getPathLoss(pus[j].loc, sus[i].loc);
+						v = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
 					}
 					path_losses[j][i][x] = v;
 				}
@@ -739,8 +739,6 @@ void TransmitterOnlySplatPM::preprocessPathLoss(PR* pr, float su_height, int pu_
 		std::stringstream sstr;
 		sstr << splat_dir << "ano_files/pr_" << pu_id << "_" << pr_id << ".ano";
 		pr->splat_ano_filename = sstr.str();
-
-		std::cout << pr->splat_ano_filename << std::endl;
 	}
 
 	// Convert location to longitude and lattitude
@@ -833,7 +831,7 @@ float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& 
 	};
 
 	if(loc1.dist(cur_loc) > 0.01) {
-		std::cerr << "Mismatching locations" << std::endl;
+		std::cerr << "Mismatching locations: (" << loc1.x << ", " << loc1.y << ") vs (" << cur_loc.x << ", " << cur_loc.y << ")" << std::endl;
 		exit(1);
 	}
 
