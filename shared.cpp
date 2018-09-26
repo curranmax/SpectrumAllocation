@@ -42,3 +42,24 @@ void Shared::get(std::vector<float>& vs) {
 	float_set = false;
 	mtx.unlock();
 }
+
+void Shared::set(const GridTable* gt) {
+	while(gt_set) {}
+
+	mtx.lock();
+	vs_gt = gt;
+
+	gt_set = true;
+	mtx.unlock();
+}
+
+void Shared::get(GridTable& gt) {
+	while(!gt_set) {}
+
+	mtx.lock();
+	gt = *vs_gt;
+	vs_gt = nullptr;
+
+	gt_set = false;
+	mtx.unlock();
+}

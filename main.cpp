@@ -384,11 +384,14 @@ int main(int argc, char const *argv[]) {
 		std::cout << "send_SU|float|" << sm_entity.getAverageDuration("SU") << std::endl;
 		std::cout << "send_SU_num|float|" << sm_entity.numDurations("SU") << std::endl;
 
-		std::cout << "send_SS|float|" << sm_entity.getAverageDuration("SS") << std::endl;
-		std::cout << "send_SS_num|float|" << sm_entity.numDurations("SS") << std::endl;
+		std::cout << "send_GT|float|" << sm_entity.getAverageDuration("GT") << std::endl;
+		std::cout << "send_GT_num|float|" << sm_entity.numDurations("GT") << std::endl;
 
-		std::cout << "send_PU_inds|float|" << sm_entity.getAverageDuration("PU inds") << std::endl;
-		std::cout << "send_PU_inds_num|float|" << sm_entity.numDurations("PU inds") << std::endl;
+		// std::cout << "send_SS|float|" << sm_entity.getAverageDuration("SS") << std::endl;
+		// std::cout << "send_SS_num|float|" << sm_entity.numDurations("SS") << std::endl;
+
+		// std::cout << "send_PU_inds|float|" << sm_entity.getAverageDuration("PU inds") << std::endl;
+		// std::cout << "send_PU_inds_num|float|" << sm_entity.numDurations("PU inds") << std::endl;
 
 		std::cout << "send_PU|float|" << sm_entity.getAverageDuration("PU") << std::endl;
 		std::cout << "send_PU_num|float|" << sm_entity.numDurations("PU") << std::endl;
@@ -404,11 +407,14 @@ int main(int argc, char const *argv[]) {
 		std::cout << "recv_SU|float|" << ks_entity.getAverageDuration("SU") << std::endl;
 		std::cout << "recv_SU_num|float|" << ks_entity.numDurations("SU") << std::endl;
 
-		std::cout << "recv_SS|float|" << ks_entity.getAverageDuration("SS") << std::endl;
-		std::cout << "recv_SS_num|float|" << ks_entity.numDurations("SS") << std::endl;
+		std::cout << "recv_GT|float|" << ks_entity.getAverageDuration("GT") << std::endl;
+		std::cout << "recv_GT_num|float|" << ks_entity.numDurations("GT") << std::endl;
 
-		std::cout << "recv_PU_inds|float|" << ks_entity.getAverageDuration("PU inds") << std::endl;
-		std::cout << "recv_PU_inds_num|float|" << ks_entity.numDurations("PU inds") << std::endl;
+		// std::cout << "recv_SS|float|" << ks_entity.getAverageDuration("SS") << std::endl;
+		// std::cout << "recv_SS_num|float|" << ks_entity.numDurations("SS") << std::endl;
+
+		// std::cout << "recv_PU_inds|float|" << ks_entity.getAverageDuration("PU inds") << std::endl;
+		// std::cout << "recv_PU_inds_num|float|" << ks_entity.numDurations("PU inds") << std::endl;
 
 		std::cout << "recv_PU|float|" << ks_entity.getAverageDuration("PU") << std::endl;
 		std::cout << "recv_PU_num|float|" << ks_entity.numDurations("PU") << std::endl;

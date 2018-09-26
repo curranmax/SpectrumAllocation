@@ -1553,42 +1553,46 @@ void SpectrumManager::sendEncryptedData(const SUint& su, const GridTable& grid_t
 	shared_memory->set(su.getValues());
 	en_timers["entities"].end("SU");
 
-	// Grid Table - SS
-	std::vector<int> gt_ss_size = {int(grid_table.sss.size())};
-	shared_memory->set(gt_ss_size);
+	en_timers["entities"].start("GT");
+	shared_memory->set(&grid_table);
+	en_timers["entities"].end("GT");
 
-	// Assume grid_table.sss keys go from 1 to n
-	for(unsigned int i = 0; i < grid_table.sss.size(); ++i) {
-		auto ss_itr = grid_table.sss.find(i);
-		if(ss_itr == grid_table.sss.end()) {
-			std::cerr << "Error in SS table" << std::endl;
-			exit(1);
-		}
+	// // Grid Table - SS
+	// std::vector<int> gt_ss_size = {int(grid_table.sss.size())};
+	// shared_memory->set(gt_ss_size);
 
-		shared_memory->set(std::vector<int>{int(ss_itr->second.size())});
+	// // Assume grid_table.sss keys go from 1 to n
+	// for(unsigned int i = 0; i < grid_table.sss.size(); ++i) {
+	// 	auto ss_itr = grid_table.sss.find(i);
+	// 	if(ss_itr == grid_table.sss.end()) {
+	// 		std::cerr << "Error in SS table" << std::endl;
+	// 		exit(1);
+	// 	}
 
-		for(unsigned int j = 0; j < ss_itr->second.size(); ++j) {
-			en_timers["entities"].start("SS");
-			shared_memory->set(ss_itr->second[j].getValues());
-			en_timers["entities"].end("SS");
-		}
-	}
+	// 	shared_memory->set(std::vector<int>{int(ss_itr->second.size())});
 
-	// Grid Table - PU
-	shared_memory->set(std::vector<int>{int(grid_table.pu_refs.size())});
+	// 	for(unsigned int j = 0; j < ss_itr->second.size(); ++j) {
+	// 		en_timers["entities"].start("SS");
+	// 		shared_memory->set(ss_itr->second[j].getValues());
+	// 		en_timers["entities"].end("SS");
+	// 	}
+	// }
 
-	// Assume grid_table.pu_ref keys go from 1 to n
-	for(unsigned int i = 0; i < grid_table.pu_refs.size(); ++i) {
-		auto pu_ref_itr = grid_table.pu_refs.find(i);
-		if(pu_ref_itr == grid_table.pu_refs.end()) {
-			std::cerr << "Error in PU_REF table" << std::endl;
-			exit(1);
-		}
+	// // Grid Table - PU
+	// shared_memory->set(std::vector<int>{int(grid_table.pu_refs.size())});
 
-		en_timers["entities"].start("PU inds");
-		shared_memory->set(pu_ref_itr->second);
-		en_timers["entities"].end("PU inds");
-	}
+	// // Assume grid_table.pu_ref keys go from 1 to n
+	// for(unsigned int i = 0; i < grid_table.pu_refs.size(); ++i) {
+	// 	auto pu_ref_itr = grid_table.pu_refs.find(i);
+	// 	if(pu_ref_itr == grid_table.pu_refs.end()) {
+	// 		std::cerr << "Error in PU_REF table" << std::endl;
+	// 		exit(1);
+	// 	}
+
+	// 	en_timers["entities"].start("PU inds");
+	// 	shared_memory->set(pu_ref_itr->second);
+	// 	en_timers["entities"].end("PU inds");
+	// }
 
 	// PU Table
 	shared_memory->set(std::vector<int>{int(pu_table.pus.size()), pu_table.num_pr_per_pu});
@@ -1630,41 +1634,45 @@ void SpectrumManager::recvEncryptedData(SUint* su, GridTable* grid_table, PUTabl
 	su->setValues(vals);
 	en_timers["entities"].end("SU");
 
-	// Grid Table - SS
-	std::vector<int> gt_ss_c;
-	shared_memory->get(gt_ss_c);
-	int gt_ss_entries = gt_ss_c[0];
+	en_timers["entities"].start("GT");
+	shared_memory->get(*grid_table);
+	en_timers["entities"].end("GT");
 
-	for(int i = 0; i < gt_ss_entries; ++i) {
-		std::vector<int> gt_ss_entry_c;
-		shared_memory->get(gt_ss_entry_c);
-		int gt_ss_entry_size = gt_ss_entry_c[0];
+	// // Grid Table - SS
+	// std::vector<int> gt_ss_c;
+	// shared_memory->get(gt_ss_c);
+	// int gt_ss_entries = gt_ss_c[0];
 
-		std::vector<SSint> this_entry(gt_ss_entry_size);
-		for(int j = 0; j < gt_ss_entry_size; ++j) {
-			vals.clear();
-			en_timers["entities"].start("SS");
-			shared_memory->get(vals);
-			this_entry[j].setValues(vals);
-			en_timers["entities"].end("SS");
-		}
+	// for(int i = 0; i < gt_ss_entries; ++i) {
+	// 	std::vector<int> gt_ss_entry_c;
+	// 	shared_memory->get(gt_ss_entry_c);
+	// 	int gt_ss_entry_size = gt_ss_entry_c[0];
 
-		grid_table->sss[i] = this_entry;
-	}
+	// 	std::vector<SSint> this_entry(gt_ss_entry_size);
+	// 	for(int j = 0; j < gt_ss_entry_size; ++j) {
+	// 		vals.clear();
+	// 		en_timers["entities"].start("SS");
+	// 		shared_memory->get(vals);
+	// 		this_entry[j].setValues(vals);
+	// 		en_timers["entities"].end("SS");
+	// 	}
 
-	// Grid Table - PU
-	std::vector<int> gt_pu_ref_c;
-	shared_memory->get(gt_pu_ref_c);
-	int gt_pu_ref_entries = gt_pu_ref_c[0];
+	// 	grid_table->sss[i] = this_entry;
+	// }
 
-	for(int i = 0; i < gt_pu_ref_entries; ++i) {
-		vals.clear();
+	// // Grid Table - PU
+	// std::vector<int> gt_pu_ref_c;
+	// shared_memory->get(gt_pu_ref_c);
+	// int gt_pu_ref_entries = gt_pu_ref_c[0];
 
-		en_timers["entities"].start("PU inds");
-		shared_memory->get(vals);
-		grid_table->pu_refs[i] = vals;
-		en_timers["entities"].end("PU inds");
-	}
+	// for(int i = 0; i < gt_pu_ref_entries; ++i) {
+	// 	vals.clear();
+
+	// 	en_timers["entities"].start("PU inds");
+	// 	shared_memory->get(vals);
+	// 	grid_table->pu_refs[i] = vals;
+	// 	en_timers["entities"].end("PU inds");
+	// }
 
 	// PU Table
 	std::vector<int> put_c;
