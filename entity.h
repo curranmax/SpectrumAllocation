@@ -10,6 +10,8 @@ public:
 	Entity() {}
 	virtual ~Entity() {}
 
+	virtual bool fullEncrypt() const { return true; }
+
 	// For encryption/decryption
 	virtual std::string getType() const = 0;
 	virtual int getID() const = 0;

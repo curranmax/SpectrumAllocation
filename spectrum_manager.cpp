@@ -319,7 +319,16 @@ std::vector<float> SpectrumManager::runSM(
 		std::cerr << "Must use grid with SM&KS" << std::endl;
 		exit(1);
 	}
+
+
 	for(unsigned int i = 0; i < all_sus.size(); ++i) {
+		{
+			// Make sure the SM and KS are synced at this point
+			shared_memory->set(std::vector<int>{1});
+			std::vector<float> tmp;
+			shared_memory->get(tmp);
+		}
+
 		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
 			std::cout << "Starting request for SU " << i + 1 << std::endl;
 		}
@@ -413,6 +422,13 @@ std::vector<float> SpectrumManager::runKS(int num_sus, std::map<std::string, Tim
 		exit(1);
 	}
 	for(int i = 0; i < num_sus; ++i) {
+		{
+			// Make sure the SM and KS are synced at this point
+			std::vector<int> tmp;
+			shared_memory->get(tmp);
+			shared_memory->set(std::vector<float>{1.0});
+		}
+
 		if(parties[0].isLocalParty()  && !sm_params->brief_out) {
 			std::cout << "Starting request for SU " << i + 1 << std::endl;
 		}
