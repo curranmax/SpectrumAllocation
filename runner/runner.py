@@ -27,11 +27,14 @@ LARGE_TEST = 'large_test'
 TEST_OUTPUT= 'test_output'
 OUTPUT_RUN = 'output'
 
+DENSITY_TEST = 'density'
+
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						PATH_LOSS_TEST, KS_TIMING, MED_TEST, LARGE_TEST,
-						TEST_OUTPUT, OUTPUT_RUN]
+						TEST_OUTPUT, OUTPUT_RUN,
+						DENSITY_TEST]
 
 # Change parameters
 NUM_SS_SELECTION = 'num_ss_selection'
@@ -590,6 +593,17 @@ if __name__ == '__main__':
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/data1.txt']})
+		if experiment == DENSITY_TEST:
+			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
+				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
+				'num_pr_per_pu' : [5], 'pr_range': [100.0],
+				'propagation_model': ['single_lr'],
+				'num_pu': [4], 'num_ss': [40, 100, 200, 400], 'num_su': [100],
+				PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1.0 * 1000.0], 'unit_type': ['db'],
+				'central_entities': ['two_sms'],
+				'no_pr_thresh_update': [False]}
+			changes.append(c)
+
 
 	num_experiments = sum(reduce(mul, [len(vals) for _, vals in change.iteritems()]) for change in changes) * args.num_tests[0]
 
