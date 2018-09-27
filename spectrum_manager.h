@@ -33,8 +33,8 @@ public:
 	};
 
 	SMParams() = delete;
-	SMParams(float _factor, int _bit_count, int _num_pu_selection, int _num_ss_selection, int _rp_alpha, int _pl_alpha, bool _brief_out) :
-			brief_out(_brief_out), factor(_factor), bit_count(_bit_count), num_ss_selection(_num_ss_selection), num_pu_selection(_num_pu_selection),
+	SMParams(float _factor, int _float_bits, int _bit_count, int _num_pu_selection, int _num_ss_selection, int _rp_alpha, int _pl_alpha, bool _brief_out) :
+			brief_out(_brief_out), factor(_factor), float_bits(_float_bits), bit_count(_bit_count), num_ss_selection(_num_ss_selection), num_pu_selection(_num_pu_selection),
 			rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), pl_est_gamma(0.0), no_pr_thresh_update(false), selection_algo(NONE), secure_write_algo(PROPOSED),
 			use_grid(false), grid_min_num_pu(0), grid_min_num_ss(0), grid_num_x(0), grid_num_y(0), grid_delta_x(0), grid_delta_y(0),
 			num_io_threads(0), server_addr(""), connection_name(""), channel_name("") {}
@@ -82,7 +82,7 @@ public:
 	bool brief_out;
 
 	float factor;
-	int bit_count;
+	int float_bits, bit_count;
 
 	int num_ss_selection, num_pu_selection;
 	int rp_alpha, pl_alpha;

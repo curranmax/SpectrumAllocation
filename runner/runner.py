@@ -527,11 +527,10 @@ if __name__ == '__main__':
 			if experiment == FULL_TEST_SM_KS:
 				num_su = 2
 
-			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
+			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
-					# 'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks']),
@@ -545,7 +544,7 @@ if __name__ == '__main__':
 
 			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
 			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
-			num_bits_test['s2_pc_bit_count'] = [32, 48, 64]
+			num_bits_test[('s2_pc_bit_count', 'num_float_bits')] = [(32, 8), (48, 12), (64, 16)]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 

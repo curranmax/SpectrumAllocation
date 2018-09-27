@@ -38,66 +38,6 @@ int main(int argc, char const *argv[]) {
 	} else {
 		std::cout << "Using random seed: " << rs << std::endl;
 	}
-
-	// {
-	// 	// Test Shared.h
-	// 	Shared shared;
-
-	// 	std::thread thrd1([&]() {
-	// 		Socket s1("127.0.0.1", 8081);
-	// 		bool connected = s1.listenFor();
-	// 		if(connected) {
-	// 			std::cout << "s1 is connected" << std::endl;
-	// 		} else {
-	// 			std::cout << "s1 is not connected" << std::endl;
-	// 		}
-
-	// 		std::vector<int> vs1, vs2;
-	// 		std::vector<float> vs3;
-	// 		for(unsigned int i = 0; i < 100; ++i) {
-	// 			vs1.push_back(i + 1);
-	// 			vs2.push_back(100 - i);
-	// 			vs3.push_back(float(i) / 2);
-	// 		}
-
-	// 		shared.set(vs1);
-	// 		shared.set(vs2);
-	// 		shared.set(vs3);
-	// 	});
-
-	// 	std::thread thrd2([&]() {
-	// 		sleep(5);
-	// 		Socket s2("127.0.0.1", 8081);
-	// 		bool connected = s2.connectTo();
-	// 		if(connected) {
-	// 			std::cout << "s2 is connected" << std::endl;
-	// 		} else {
-	// 			std::cout << "s2 is not connected" << std::endl;
-	// 		}
-
-	// 		sleep(5);
-
-	// 		std::vector<int> vs1, vs2;
-	// 		std::vector<float> vs3;
-	// 		shared.get(vs1);
-	// 		shared.get(vs2);
-	// 		shared.get(vs3);
-
-	// 		std::cout << "vs1[0] = " << vs1[0] << std::endl;
-	// 		std::cout << "vs1[" << vs1.size() - 1 << "] = " << vs1[vs1.size() - 1] << std::endl;
-
-	// 		std::cout << "vs2[0] = " << vs2[0] << std::endl;
-	// 		std::cout << "vs2[" << vs2.size() - 1 << "] = " << vs2[vs2.size() - 1] << std::endl;
-
-	// 		std::cout << "vs3[0] = " << vs3[0] << std::endl;
-	// 		std::cout << "vs3[" << vs3.size() - 1 << "] = " << vs3[vs3.size() - 1] << std::endl;
-	// 	});
-
-	// 	thrd1.join();
-	// 	thrd2.join();
-
-	// 	exit(0);
-	// }
 	
 	utils::setUnitType(args.unit_type);
 
@@ -134,7 +74,7 @@ int main(int argc, char const *argv[]) {
 	
 	// Set up Spectrum Manager params
 	float factor = 1 << args.num_float_bits;
-	SMParams sm_params(factor, args.s2_pc_bit_count, args.num_pu_selection, args.num_ss_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.brief_out);
+	SMParams sm_params(factor, args.num_float_bits, args.s2_pc_bit_count, args.num_pu_selection, args.num_ss_selection, args.ss_receive_power_alpha, args.path_loss_alpha, args.brief_out);
 	sm_params.setSelectionAlgo(args.selection_algo);
 
 	sm_params.setSecureWriteAlgo(args.secure_write_algo);

@@ -599,7 +599,11 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 	llong factor_int = llong(sm_params->factor);
 
-	int dist_scale = 1 << 28;
+	int ds_bits = sm_params->bit_count - 2 * sm_params->float_bits - 4;
+	if(ds_bits < 0) {
+		ds_bits = 0;
+	}
+	int dist_scale = 1 << ds_bits; 
 	float ratio_thresh = 1.0;
 
 	for(unsigned int i = 0; i < sss_int0->size(); ++i) {
@@ -1178,7 +1182,11 @@ float SpectrumManager::secureRadar(
 	std::vector<sInt> sss_w;
 	sInt sum_weight = INPUT(parties, 0, 0, sm_params->bit_count);
 
-	llong dist_scale = 1 << 16;
+	int ds_bits = (sm_params->bit_count - 2 * sm_params->float_bits) / 2;
+	if(ds_bits < 0) {
+		ds_bits = 0;
+	}
+	llong dist_scale = 1 << ds_bits;
 	sInt secure_dist_scale = INPUT(parties, 0, dist_scale, sm_params->bit_count);
 	for(unsigned int x = 0; x < sss_inds.size(); ++x) {
 		PWID("computing SS weight " + std::to_string(x));
