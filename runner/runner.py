@@ -17,6 +17,9 @@ VARY_NUM_SS_SELECT = 'vary_ss_select'
 
 FULL_TEST_TWO_SMS = 'full_test-two_sms'
 FULL_TEST_SM_KS = 'full_test-sm_ks'
+SMALL_GRID_TWO_SMS = 'small_grid-two_sms'
+SMALL_GRID_SM_KS = 'small_grid-sm_ks'
+
 PATH_LOSS_TEST = 'path_loss_test'
 
 KS_TIMING = 'ks_timing'
@@ -32,6 +35,7 @@ DENSITY_TEST = 'density'
 ALL_EXPERIMENT_IDS = [TEST,
 						VARY_NUM_SS_SELECT,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
+						SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS,
 						PATH_LOSS_TEST, KS_TIMING, MED_TEST, LARGE_TEST,
 						TEST_OUTPUT, OUTPUT_RUN,
 						DENSITY_TEST]
@@ -522,13 +526,17 @@ if __name__ == '__main__':
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
-		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS]:
+		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS, SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
 			num_su = 100
-			if experiment == FULL_TEST_SM_KS:
+			if experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				num_su = 2
 
+			grid_size = 1000
+			if experiment in [SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
+				grid_size = 100
+
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
-					('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
+					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
@@ -548,7 +556,7 @@ if __name__ == '__main__':
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test, num_pu_s_test] #, num_bits_test] # , secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
