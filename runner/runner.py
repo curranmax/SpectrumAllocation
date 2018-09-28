@@ -528,7 +528,7 @@ if __name__ == '__main__':
 				num_su = 2
 
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
-					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
+					('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
@@ -548,7 +548,7 @@ if __name__ == '__main__':
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
+			changes += [num_ss_s_test, num_pu_s_test] #, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
