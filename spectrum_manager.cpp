@@ -661,7 +661,7 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 				llong num = (((factor_int * rp_weights[j]) ^ bit_mask) * this_ratio_scale) ^ bit_mask;
 				llong ratio = (num / sum_rp_weights) ^ bit_mask;
 				llong num_limit = (llong(1) << (sm_params->bit_count - 4)) / 16;
-				while(num < num_limit && ratio < llong(ratio_thresh * sm_params->factor)) {
+				while(num != 0 && num < num_limit && ratio < llong(ratio_thresh * sm_params->factor)) {
 					this_ratio_scale *= llong(16);
 					num = (((factor_int * rp_weights[j]) ^ bit_mask) * this_ratio_scale) ^ bit_mask;
 					ratio =  (num / sum_rp_weights) ^ bit_mask;
