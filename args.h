@@ -42,6 +42,9 @@ class Args {
 
 	std::string central_entities;
 
+	// Debug
+	bool use_gt_rp_at_ss_from_pu;
+
 	// Generation params
 	int num_pu;
 	int num_ss;
@@ -90,8 +93,8 @@ class Args {
 	int grid_num_x, grid_num_y;
 
 	// TODO allow this to be a floating point value
-	int ss_receive_power_alpha;
-	int path_loss_alpha;
+	float ss_receive_power_alpha;
+	float path_loss_alpha;
 
 	// The number of bits to shift ints in the S2-PC calculations.
 	int num_float_bits;

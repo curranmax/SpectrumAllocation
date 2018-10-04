@@ -15,6 +15,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <string>
 #include <stdlib.h>
 #include <time.h>
@@ -66,10 +67,17 @@ int main(int argc, char const *argv[]) {
 	std::vector<PU> pus;
 	std::vector<SS> sss;
 	std::vector<SU> sus;
+
+	PathLossTable path_loss_table;
+	std::vector<std::vector<float> > rp_at_ss_from_pu, rp_at_ss_from_pu_pt;
 	if(args.in_filename == "") {
-		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus);
+		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &path_loss_table);
 	} else {
-		gen.getEntitiesFromFile(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.in_filename, &pus, &sss, &sus);
+		gen.getEntitiesFromFile(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.in_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &path_loss_table);
+	}
+
+	if(args.use_gt_rp_at_ss_from_pu) {
+		rp_at_ss_from_pu_pt = rp_at_ss_from_pu;
 	}
 	
 	// Set up Spectrum Manager params
@@ -230,9 +238,7 @@ int main(int argc, char const *argv[]) {
 		su_thrd.join();
 	}
 
-	PathLossTable path_loss_table;
-
-	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table);
+	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_pt);
 	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table, args.no_pr_thresh_update);
 
 	std::vector<float> secure_vs;
@@ -260,26 +266,93 @@ int main(int argc, char const *argv[]) {
 		}
 		std::cout << std::endl;
 
-		std::cout << "path_loss(plain,ground)|list(float,float)|";
-		unsigned int x = 0;
-		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-			if(!itr->second.pt_set || !itr->second.gt_set) {
-				std::cerr << "Path loss not set" << std::endl;
-				exit(1);
-			}
+		// std::cout << "path_loss(plain,ground)|list(float,float)|";
+		// unsigned int x = 0;
+		// for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
+		// 	if(itr->first.pr_ind == -1) {
+		// 		continue;
+		// 	}
 
-			std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
-			if(x < path_loss_table.table.size() - 1) {
-				std::cout << ",";
-			}
-			++x;
-		}
-		std::cout << std::endl;
+		// 	if(!itr->second.pt_set || !itr->second.gt_set) {
+		// 		std::cerr << "Path loss not set" << std::endl;
+		// 		exit(1);
+		// 	}
+
+		// 	std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
+		// 	if(x < path_loss_table.table.size() - 1) {
+		// 		std::cout << ",";
+		// 	}
+		// 	++x;
+		// }
+		// std::cout << std::endl;
+
+		// std::cout << "pu_path_loss(plain,ground)|list(float,float)|";
+		// x = 0;
+		// for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
+		// 	if(itr->first.pr_ind != -1) {
+		// 		continue;
+		// 	}
+
+		// 	if(!itr->second.pt_set || !itr->second.gt_set) {
+		// 		continue;
+		// 	}
+
+		// 	std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
+		// 	if(x < path_loss_table.table.size() - 1) {
+		// 		std::cout << ",";
+		// 	}
+		// 	++x;
+		// }
+		// std::cout << std::endl;
 
 		if(!args.skip_s2pc) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "time_per_request|float|" << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 			std::cout << "secure_write_time|float|" << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
+		}
+
+		if(!args.use_gt_rp_at_ss_from_pu) {
+			std::map<int, std::vector<int> > precomputed_pu_int_groups;
+			std::map<int, std::vector<int> > precomputed_ss_int_groups;
+			pt_sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
+			
+			std::set<std::pair<int, int> > relevant_ss_pu;
+
+			for(auto pu_itr = precomputed_pu_int_groups.begin(); pu_itr != precomputed_pu_int_groups.end(); ++pu_itr) {
+				auto ss_itr = precomputed_ss_int_groups.find(pu_itr->first);
+				if(ss_itr == precomputed_ss_int_groups.end()) {
+					std::cerr << "Mismatch groups: " << pu_itr->first << std::endl;
+					exit(1);
+				}
+
+				for(unsigned int x = 0; x < pu_itr->second.size(); ++x) {
+					for(unsigned int y = 0; y < ss_itr->second.size(); ++y) {
+						relevant_ss_pu.insert(std::make_pair(pu_itr->second[x], ss_itr->second[y]));
+					}
+				}
+			}
+
+			std::cout << "rp_at_ss_from_pu|list(float)|";
+			unsigned int x = 0;
+			for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
+				std::cout << rp_at_ss_from_pu[itr->first][itr->second];
+				if(x < relevant_ss_pu.size() - 1) {
+					std::cout << ",";
+				}
+				++x;
+			}
+			std::cout << std::endl;
+
+			std::cout << "rp_at_ss_from_pu_pt|list(float)|";
+			x = 0;
+			for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
+				std::cout << rp_at_ss_from_pu_pt[itr->first][itr->second];
+				if(x < relevant_ss_pu.size() - 1) {
+					std::cout << ",";
+				}
+				++x;
+			}
+			std::cout << std::endl;
 		}
 	} else {
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {

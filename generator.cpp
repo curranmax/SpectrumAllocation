@@ -27,7 +27,8 @@ const float pu_height = 50.0;
 
 void Generator::generateEntities(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string & out_filename,
-		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const {
+		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
+		std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table) const {
 	const float pr_height = (num_pr_per_pu == 1 ? pu_height : ss_height);
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
@@ -45,6 +46,7 @@ void Generator::generateEntities(
 	}
 
 	// PU
+	rp_at_ss_from_pu->clear(); // rp_at_ss_from_pu[j][i] is the receive power at SS i from PU j
 	for(int j = 0; j < num_pu; ++j) {
 		if(out_filename != "") {
 			std::cout << "Generating PU " << j + 1 << " of " << num_pu << std::endl;
@@ -112,15 +114,21 @@ void Generator::generateEntities(
 		
 		(*pus).push_back(pu);
 
+		rp_at_ss_from_pu->push_back(std::vector<float>());
 		// Loop over SS and get the path loss between the PU and SS
 		for(int i = 0; i < num_ss; ++i) {
 			float path_loss = 1.0;
 			if(out_filename == "") {
 				path_loss = pm->getPathLoss((*pus)[j].loc, (*sss)[i].loc);
 			}
+
 			if(utils::unit_type == utils::UnitType::ABS) {
+				(*rp_at_ss_from_pu)[j].push_back(path_loss * (*pus)[j].transmit_power);
+
 				(*sss)[i].received_power += path_loss * (*pus)[j].transmit_power;
 			} else if(utils::unit_type == utils::UnitType::DB) {
+				(*rp_at_ss_from_pu)[j].push_back(path_loss + (*pus)[j].transmit_power);
+
 				if(j == 0) {
 					(*sss)[i].received_power = path_loss + (*pus)[j].transmit_power;
 				} else {
@@ -148,6 +156,13 @@ void Generator::generateEntities(
 		su.less_max_tp = utils::randomFloat(-2.5, -10.0);
 		su.min_tp = -100.0;
 		(*sus).push_back(su);
+
+		if(path_loss_table != nullptr && out_filename == "") {
+			for(int j = 0; j < num_pu; ++j) {
+				float pl = pm->getPathLoss((*pus)[j].loc, (*sus)[i].loc);
+				path_loss_table->addGroundTruthPathLoss(i, j, pl);
+			}
+		}
 	}
 
 	if(out_filename != "") {
@@ -158,7 +173,8 @@ void Generator::generateEntities(
 
 void Generator::getEntitiesFromFile(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, const std::string& in_filename,
-		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) {
+		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
+		std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table) {
 	std::ifstream dstr(in_filename, std::ifstream::in);
 
 	std::vector<PU> all_pus;
@@ -358,7 +374,9 @@ void Generator::getEntitiesFromFile(
 	}
 
 	// Calculate RP for SS
+	rp_at_ss_from_pu->clear(); // rps[j][i] is the received power at SS i from PU j
 	for(int j = 0; j < num_pu; ++j) {
+		rp_at_ss_from_pu->push_back(std::vector<float>());
 		for(int i = 0; i < num_ss; ++i) {
 			auto pu_pl_itr = pu_pls.find(std::make_pair((*pus)[j].pl_id, (*sss)[i].pl_id));
 			if(pu_pl_itr == pu_pls.end()) {
@@ -368,8 +386,12 @@ void Generator::getEntitiesFromFile(
 
 			float path_loss = pu_pl_itr->second;
 			if(utils::unit_type == utils::UnitType::ABS) {
+				(*rp_at_ss_from_pu)[j].push_back(path_loss * (*pus)[j].transmit_power);
+
 				(*sss)[i].received_power += path_loss * (*pus)[j].transmit_power;
 			} else if(utils::unit_type == utils::UnitType::DB) {
+				(*rp_at_ss_from_pu)[j].push_back(path_loss + (*pus)[j].transmit_power);
+
 				if(j == 0) {
 					(*sss)[i].received_power = path_loss + (*pus)[j].transmit_power;
 				} else {
@@ -417,6 +439,11 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			float path_loss = pm->getPathLoss(pus[j].loc, sss[i].loc);
 			// std::cout << path_loss << std::endl;
 			out << "PU_PL " << j << " " << i << " " << path_loss << std::endl;
+		}
+
+		for(unsigned int i = 0; i < sus.size(); ++j) {
+			float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
+			out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);

@@ -330,7 +330,8 @@ if __name__ == '__main__':
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
 				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
 				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
-				('recvEncryptedData_recv', 'red_r'), ('recvEncryptedData_decrypt', 'red_d'), ('sendEncryptedPRThresholds', 'sepr')]
+				('recvEncryptedData_recv', 'red_r'), ('recvEncryptedData_decrypt', 'red_d'), ('sendEncryptedPRThresholds', 'sepr'),
+				('rp_split_dif', 'rsd')]
 	for full_yv, short_yv in y_values:
 		parser.add_argument('-y_' + short_yv, '--use_' + full_yv + '_for_y_value', action = 'store_true', help = 'If given, uses ' + full_yv + ' for the y dimension.')
 
@@ -341,7 +342,7 @@ if __name__ == '__main__':
 
 
 	# Group values
-	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa'), ('central_entities', 'ces')]
+	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa'), ('central_entities', 'ces'), ('use_gt_rp_at_ss_from_pu', 'use_gt_rp')]
 	for full_gv, short_gv in g_values:
 		parser.add_argument('-g_' + short_gv, '--use_' + full_gv + '_for_group_value', action = 'store_true', help = 'If given, uses ' + full_gv + ' for grouping data.')
 
@@ -380,13 +381,15 @@ if __name__ == '__main__':
 						'percent_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
 						'db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
-						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type')}
+						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
+						'rp_split_dif': ('rp_at_ss_from_pu', 'rp_at_ss_from_pu_pt', 'unit_type')}
 	complex_y_funcs = {'percent_diff_secure_vs_plain': percentDifference,
 						'percent_diff_plain_vs_ground': percentDifference,
 						'percent_diff_secure_vs_ground': percentDifference,
 						'db_diff_secure_vs_plain': dbDifference,
 						'db_diff_plain_vs_ground': dbDifference,
-						'db_diff_secure_vs_ground': dbDifference}
+						'db_diff_secure_vs_ground': dbDifference,
+						'rp_split_dif': dbDifference}
 	this_y_value = None
 	for full_yv, _ in y_values:
 		if getattr(args, 'use_' + full_yv + '_for_y_value'):

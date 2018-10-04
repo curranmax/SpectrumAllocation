@@ -37,10 +37,12 @@ public:
 	}
 
 	void generateEntities(int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string& out_filename,
-						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus) const;
+						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
+						std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table) const;
 
 	void getEntitiesFromFile(int num_pu, int num_ss, int num_su, int num_pr_per_pu, const std::string& in_filename,
-						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus);
+						std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
+						std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table);
 
 	void outputEntities(const std::string& out_filename, std::vector<PU>& pus, const std::vector<SS>& sss, const std::vector<SU>& sus) const;
 

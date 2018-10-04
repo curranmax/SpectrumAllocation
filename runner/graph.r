@@ -123,17 +123,17 @@ make_ple_cdf <- function(data, f_name = "ple_cdf") {
 time_npu_s_data = data.frame("x" = c(1,2,3,4), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8), "c" = c(0.5, 1.0, 1.5, 2.0))
 make_time_npu_s(time_npu_s_data)
 
-time_nss_s_data = data.frame("x" = c(1,2,3,4), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8), "c" = c(0.5, 1.0, 1.5, 2.0))
-make_time_nss_s(time_nss_s_data)
+# time_nss_s_data = data.frame("x" = c(1,2,3,4), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8), "c" = c(0.5, 1.0, 1.5, 2.0))
+# make_time_nss_s(time_nss_s_data)
 
-time_bits_data = data.frame("x" = c(1,2,3,4), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8), "c" = c(0.5, 1.0, 1.5, 2.0))
-make_time_bits(time_bits_data)
+# time_bits_data = data.frame("x" = c(1,2,3,4), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8), "c" = c(0.5, 1.0, 1.5, 2.0))
+# make_time_bits(time_bits_data)
 
-secure_read_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
-make_secure_read(secure_read_data)
+# secure_read_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
+# make_secure_read(secure_read_data)
 
-secure_write_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
-make_secure_write(secure_write_data)
+# secure_write_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
+# make_secure_write(secure_write_data)
 
-ple_cdf_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
-make_ple_cdf(ple_cdf_data)
+# ple_cdf_data = data.frame("x" = c(1,2,3,4), "c" = c(0.5, 1.0, 1.5, 2.0), "d" = c(1.0, 2.0, 3.0, 4.0), "a" = c(0.1, 0.2, 0.3, 0.4), "b" = c(0.2, 0.4, 0.6, 0.8))
+# make_ple_cdf(ple_cdf_data)

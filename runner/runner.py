@@ -13,6 +13,8 @@ import time
 # Experiments
 TEST = 'test'
 
+ALPHA_TEST = 'alpha_test'
+
 VARY_NUM_SS_SELECT = 'vary_ss_select'
 
 FULL_TEST_TWO_SMS = 'full_test-two_sms'
@@ -32,7 +34,7 @@ OUTPUT_RUN = 'output'
 
 DENSITY_TEST = 'density'
 
-ALL_EXPERIMENT_IDS = [TEST,
+ALL_EXPERIMENT_IDS = [TEST, ALPHA_TEST,
 						VARY_NUM_SS_SELECT,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS,
@@ -51,6 +53,8 @@ def makeDefaultExperimentParam():
 	param.skip_s2pc = False
 
 	param.central_entities = 'two_sms'
+
+	param.use_gt_rp_at_ss_from_pu = False
 
 	param.num_pu = 5
 	param.num_su = 10
@@ -107,6 +111,8 @@ class ExperimentParam:
 		self.skip_s2pc = None
 
 		self.central_entities = None
+
+		self.use_gt_rp_at_ss_from_pu = None
 
 		self.num_pu = None
 		self.num_su = None
@@ -180,6 +186,9 @@ class ExperimentResult:
 		self.time_per_request = None
 		self.secure_write_time = None
 		self.path_loss = None
+
+		self.rp_at_ss_from_pu = None
+		self.rp_at_ss_from_pu_pt = None
 
 	def getCols(self):
 		# each value is a 3 tuple (var_name, var_name_for_output, val_type)
@@ -320,6 +329,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 	var_flag_names = {
 			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
 			'central_entities': 'ces',
+			'use_gt_rp_at_ss_from_pu': 'use_gt_rp',
 			'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
 			'num_pr_per_pu': 'npr', 'pr_range': 'prr', 'out_filename': 'out', 'in_filename': 'inf',
 			'unit_type': 'ut', 'propagation_model': 'pm',
@@ -521,6 +531,31 @@ if __name__ == '__main__':
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
 							'location_range': [100.0], 'num_ss': [100], 'num_su': [100], 'unit_type': ['db'],
 							'num_pr_per_pu': [5], 'pr_range': [10.0]})
+
+		if experiment == ALPHA_TEST:
+			rp_alphas = []
+			rp_alphas += [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+			rp_alphas += [2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0]
+			rp_alphas += [4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0]
+			rp_alphas += [6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0]
+			rp_alphas += [8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9.0, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0]
+			files = ['../gen_out/data3.txt']
+			grid_size = 100
+			n_sel = 10
+
+			# TODO if tests are quick, run for all three data files.
+
+			vals = {NUM_SS_SELECTION: [n_sel], 'num_pu_selection': [n_sel], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
+					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
+					'num_pr_per_pu' : [5], 'pr_range': [100.0],
+					'propagation_model': ['input_file'], 'in_filename' : files,
+					'num_pu': [400], 'num_ss': [4000], 'num_su': [1],
+					PL_ALPHA: [2], RP_ALPHA: rp_alphas, 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+					'central_entities': ['two_sms'],
+					'no_pr_thresh_update': [False], 'skip_s2pc': [True]}
+
+			changes.append(vals)
+
 		if experiment == VARY_NUM_SS_SELECT:
 			changes.append({NUM_SS_SELECTION: [1, 25, 50, 75, 100], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none'), (250, 250, 'none'), (500, 500, 'none')],
 							'propagation_model': ['longley_rice'],
@@ -541,8 +576,9 @@ if __name__ == '__main__':
 					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
-					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS else ['sm_ks']),
-					'no_pr_thresh_update': [False]}
+					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
+					'no_pr_thresh_update': [False],
+					'use_gt_rp_at_ss_from_pu': [False, True]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
@@ -556,7 +592,7 @@ if __name__ == '__main__':
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
+			changes += [num_ss_s_test] # , num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
@@ -596,10 +632,10 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [10], 'pr_range': [100.0],
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [100], 'num_pr_per_pu' : [10], 'pr_range': [100.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['../gen_out/data1.txt']})
+							'out_filename': ['../gen_out/data_full1.txt']})
 		if experiment == DENSITY_TEST:
 			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],

@@ -1799,31 +1799,61 @@ void SpectrumManager::recvEncryptedPRThresholds(PUTable* pu_table, std::map<std:
 	en_timers["total"].end("recvEncryptedPRThresholds");
 }
 
-std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table) const {
+std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_pt) const {
 	P("start PlaintextSpectrumManager::plainTextRun");
 	std::vector<PU> pus = input_pus;
 
 	// Compute the share of received power for each
 	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
 	std::vector<std::vector<float> > received_powers;
-	for(unsigned int i = 0; i < sss.size(); ++i) {
-		std::vector<float> rp_weights;
-		float sum_rp_weights = 0.0;
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			rp_weights.push_back(1.0 / pow(sss[i].loc.dist(pus[j].loc), sm_params->rp_alpha));
-			sum_rp_weights += rp_weights[j];
+	if(rp_at_ss_from_pu_pt->size() == 0) {
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			std::vector<float> rp_weights;
+			float sum_rp_weights = 0.0;
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				rp_weights.push_back(1.0 / pow(sss[i].loc.dist(pus[j].loc), sm_params->rp_alpha_f));
+				sum_rp_weights += rp_weights[j];
+			}
+
+			received_powers.push_back(std::vector<float>());
+
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				if(utils::unit_type == utils::UnitType::ABS) {
+					received_powers[i].push_back(rp_weights[j] * sss[i].received_power / sum_rp_weights);
+				} else if(utils::unit_type == utils::UnitType::DB) {
+					received_powers[i].push_back(utils::todBm(rp_weights[j] / sum_rp_weights) + sss[i].received_power);
+				} else {
+					std::cerr << "Unsupported unit_type" << std::endl;
+					exit(1);
+				}
+			}
 		}
 
-		received_powers.push_back(std::vector<float>());
-
+		rp_at_ss_from_pu_pt->clear(); // rp_at_ss_from_pu_pt[j][i] is the estimated received power at SS i from PU j
 		for(unsigned int j = 0; j < pus.size(); ++j) {
-			if(utils::unit_type == utils::UnitType::ABS) {
-				received_powers[i].push_back(rp_weights[j] * sss[i].received_power / sum_rp_weights);
-			} else if(utils::unit_type == utils::UnitType::DB) {
-				received_powers[i].push_back(utils::todBm(rp_weights[j] / sum_rp_weights) + sss[i].received_power);
-			} else {
-				std::cerr << "Unsupported unit_type" << std::endl;
+			rp_at_ss_from_pu_pt->push_back(std::vector<float>());
+			for(unsigned int i = 0; i < sss.size(); ++i) {
+				(*rp_at_ss_from_pu_pt)[j].push_back(received_powers[i][j]);
+			}
+		}
+	} else {
+		std::cout << "Using GT rp_at_ss_from_pu_pt" << std::endl;
+		if(rp_at_ss_from_pu_pt->size() != pus.size()) {
+			std::cerr << "GT rps don't match the number of pus" << std::endl;
+			exit(1);
+		}
+
+		for(unsigned int j = 0; j < rp_at_ss_from_pu_pt->size(); ++j) {
+			if((*rp_at_ss_from_pu_pt)[j].size() != sss.size()) {
+				std::cerr << "GT rps don't match the number of sss" << std::endl;
 				exit(1);
+			}
+		}
+
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			received_powers.push_back(std::vector<float>());
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				received_powers[i].push_back((*rp_at_ss_from_pu_pt)[j][i]);
 			}
 		}
 	}
@@ -2105,6 +2135,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 		}
 		
 		float this_pu_path_loss = sum_weighted_ratio / sum_weight;
+		path_loss_table->addPlaintextPathLoss(su.index, j, this_pu_path_loss);
 
 		estimated_path_loss.push_back(std::vector<float>());
 		for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
