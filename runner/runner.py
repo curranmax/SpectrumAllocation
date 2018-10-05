@@ -632,8 +632,8 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [4], 'num_ss': [40], 'num_su': [10], 'num_pr_per_pu' : [5], 'pr_range': [10.0],
-							'location_range': [1000.0], 'unit_type': ['db'],
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [200], 'num_pr_per_pu' : [5], 'pr_range': [10.0],
+							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/data_full1.txt']})
 		if experiment == DENSITY_TEST:
