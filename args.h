@@ -44,6 +44,7 @@ class Args {
 
 	// Debug
 	bool use_gt_rp_at_ss_from_pu;
+	bool use_gt_su_pu_pl;
 
 	// Generation params
 	int num_pu;

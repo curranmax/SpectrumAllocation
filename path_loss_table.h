@@ -70,17 +70,6 @@ public:
 
 	PathLossTable(const PathLossTable& plt) = delete;
 	const PathLossTable& operator=(const PathLossTable& plt) = delete;
-
-	// All pt path losses get added
-	bool addPlaintextPathLoss(int su_ind, int pu_ind, float path_loss) {
-		return table[PLTKey(su_ind, pu_ind, -1)].setPlaintextPathLoss(path_loss);
-	}
-
-	// Only add gt path losses, if there is already an entry in the table from pt.
-	bool addGroundTruthPathLoss(int su_ind, int pu_ind, float path_loss) {
-		PLTKey key(su_ind, pu_ind, -1);
-		return table[key].setGroundTruthPathLoss(path_loss);
-	}
 	
 	// All pt path losses get added
 	bool addPlaintextPathLoss(int su_ind, int pu_ind, int pr_ind, float path_loss) {

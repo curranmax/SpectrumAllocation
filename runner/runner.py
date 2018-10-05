@@ -55,6 +55,7 @@ def makeDefaultExperimentParam():
 	param.central_entities = 'two_sms'
 
 	param.use_gt_rp_at_ss_from_pu = False
+	param.use_gt_su_pu_pl = False
 
 	param.num_pu = 5
 	param.num_su = 10
@@ -113,6 +114,7 @@ class ExperimentParam:
 		self.central_entities = None
 
 		self.use_gt_rp_at_ss_from_pu = None
+		self.use_gt_su_pu_pl = None
 
 		self.num_pu = None
 		self.num_su = None
@@ -329,7 +331,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 	var_flag_names = {
 			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
 			'central_entities': 'ces',
-			'use_gt_rp_at_ss_from_pu': 'use_gt_rp',
+			'use_gt_rp_at_ss_from_pu': 'use_gt_rp', 'use_gt_su_pu_pl': 'use_gt_su_pu_pl',
 			'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
 			'num_pr_per_pu': 'npr', 'pr_range': 'prr', 'out_filename': 'out', 'in_filename': 'inf',
 			'unit_type': 'ut', 'propagation_model': 'pm',
@@ -526,10 +528,10 @@ if __name__ == '__main__':
 
 	for experiment in experiments:
 		if experiment == TEST:
-			changes.append({NUM_SS_SELECTION: [1, 10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
-							'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
-							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2],
-							'location_range': [100.0], 'num_ss': [100], 'num_su': [100], 'unit_type': ['db'],
+			changes.append({NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
+							'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/test.txt'],
+							'num_pu': [4], PL_ALPHA: [2], RP_ALPHA: [2],
+							'location_range': [1000.0], 'num_ss': [400], 'num_su': [1], 'unit_type': ['db'],
 							'num_pr_per_pu': [5], 'pr_range': [10.0]})
 
 		if experiment == ALPHA_TEST:
@@ -578,7 +580,7 @@ if __name__ == '__main__':
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
 					'no_pr_thresh_update': [False],
-					'use_gt_rp_at_ss_from_pu': [False, True]}
+					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(False, False), (True, False), (True, True)]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)

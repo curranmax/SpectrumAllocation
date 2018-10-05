@@ -1799,7 +1799,7 @@ void SpectrumManager::recvEncryptedPRThresholds(PUTable* pu_table, std::map<std:
 	en_timers["total"].end("recvEncryptedPRThresholds");
 }
 
-std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_pt) const {
+std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_pt, std::vector<std::vector<float> >* su_pu_pl) const {
 	P("start PlaintextSpectrumManager::plainTextRun");
 	std::vector<PU> pus = input_pus;
 
@@ -1894,6 +1894,15 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 		exit(1);
 	}
 
+	if(su_pu_pl == nullptr) {
+		std::cerr << "No su_pu_pl supplied" << std::endl;
+		exit(1);
+	}
+
+	if(su_pu_pl->size() == 0) {
+		*su_pu_pl = std::vector<std::vector<float> >(sus.size());
+	}
+
 	std::vector<PU*> sel_pus;
 	std::vector<const SS*> sel_sss;
 	std::vector<std::vector<float> > this_rps;
@@ -1939,7 +1948,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 
 			this_rps = rp_itr->second;
 		}
-		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table);
+		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
 		all_vals.push_back(v);
 		std::cout << "Finished PT request for SU " << i << std::endl;
 	}
@@ -2010,7 +2019,7 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<PU>& pus, const s
 }
 
 float PlaintextSpectrumManager::plainTextRadar(
-		const SU& su, std::vector<PU*>& pus, const std::vector<const SS*>& sss, const std::vector<std::vector<float> >& received_powers, PathLossTable* path_loss_table) const {
+		const SU& su, std::vector<PU*>& pus, const std::vector<const SS*>& sss, const std::vector<std::vector<float> >& received_powers, PathLossTable* path_loss_table, std::vector<float>* this_su_pu_pl) const {
 	// PU selection.
 	std::vector<int> pu_inds;
 	unsigned int k_pu = numSelect(sm_params->num_pu_selection, pus.size());
@@ -2113,6 +2122,11 @@ float PlaintextSpectrumManager::plainTextRadar(
 		weights.push_back(w);
 		tmp_sum_weight += w;
 	}
+
+	bool read_su_pu_pl = (this_su_pu_pl->size() != 0);
+	if(!read_su_pu_pl) {
+		*this_su_pu_pl = std::vector<float>(pus.size(), 0.0);
+	}
 	
 	// Compute SU transmit power
 	// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
@@ -2135,7 +2149,13 @@ float PlaintextSpectrumManager::plainTextRadar(
 		}
 		
 		float this_pu_path_loss = sum_weighted_ratio / sum_weight;
-		path_loss_table->addPlaintextPathLoss(su.index, j, this_pu_path_loss);
+
+		if(read_su_pu_pl) {
+			this_pu_path_loss = (*this_su_pu_pl)[j];
+		} else {
+			(*this_su_pu_pl)[j] = this_pu_path_loss;
+		}
+
 
 		estimated_path_loss.push_back(std::vector<float>());
 		for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {

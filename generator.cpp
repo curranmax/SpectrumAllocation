@@ -28,7 +28,7 @@ const float pu_height = 50.0;
 void Generator::generateEntities(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string & out_filename,
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
-		std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table) const {
+		std::vector<std::vector<float> >* rp_at_ss_from_pu, std::vector<std::vector<float> >* gt_su_pu_pl) const {
 	const float pr_height = (num_pr_per_pu == 1 ? pu_height : ss_height);
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
@@ -157,10 +157,11 @@ void Generator::generateEntities(
 		su.min_tp = -100.0;
 		(*sus).push_back(su);
 
-		if(path_loss_table != nullptr && out_filename == "") {
+		if(gt_su_pu_pl != nullptr && out_filename == "") {
+			gt_su_pu_pl->push_back(std::vector<float>());
 			for(int j = 0; j < num_pu; ++j) {
 				float pl = pm->getPathLoss((*pus)[j].loc, (*sus)[i].loc);
-				path_loss_table->addGroundTruthPathLoss(i, j, pl);
+				(*gt_su_pu_pl)[i].push_back(pl);
 			}
 		}
 	}
@@ -174,7 +175,7 @@ void Generator::generateEntities(
 void Generator::getEntitiesFromFile(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, const std::string& in_filename,
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
-		std::vector<std::vector<float> >* rp_at_ss_from_pu, PathLossTable* path_loss_table) {
+		std::vector<std::vector<float> >* rp_at_ss_from_pu, std::vector<std::vector<float> >* gt_su_pu_pl) {
 	std::ifstream dstr(in_filename, std::ifstream::in);
 
 	std::vector<PU> all_pus;
@@ -183,6 +184,7 @@ void Generator::getEntitiesFromFile(
 
 	// Store the path losses (in generator or in pm
 	std::map<std::pair<int, int>, float> pu_pls;
+	std::map<std::pair<int, int>, float> su_pu_pls;
 	pr_pls.clear();
 
 	std::string token = "";
@@ -292,6 +294,27 @@ void Generator::getEntitiesFromFile(
 			}
 
 			pr_pls[v] = pl;
+		} else if(token == "SU_PU_PL") {
+			int pu_id = -1, su_id = -1;
+			float pl = 0.0;
+			sstr >> pu_id >> su_id >> pl;
+
+			if(pu_id < 0 || pu_id >= int(all_pus.size())) {
+				std::cerr << "Invalid pu_id in SU_PU_PL" << std::endl;
+				exit(1);
+			}
+			if(su_id < 0 || su_id >= int(all_sus.size())) {
+				std::cerr << "Invalid su_id in SU_PU_PL" << std::endl;
+				exit(1);
+			}
+
+			auto v = std::make_pair(pu_id, su_id);
+			if(su_pu_pls.count(v) != 0) {
+				std::cerr << "Repeat PR_PL" << std::endl;
+				exit(1);
+			}
+
+			su_pu_pls[v] = pl;
 		} else {
 			std::cerr << "Unexpected token: " << token << std::endl;
 			exit(1);
@@ -397,6 +420,16 @@ void Generator::getEntitiesFromFile(
 				} else {
 					(*sss)[i].received_power = utils::todBm(utils::fromdBm((*sss)[i].received_power) + utils::fromdBm(path_loss + (*pus)[j].transmit_power));
 				}
+			}
+		}
+	}
+
+	if(gt_su_pu_pl != nullptr) {
+		for(int i = 0; i < num_su; ++i) {
+			gt_su_pu_pl->push_back(std::vector<float>());
+			for(int j = 0; j < num_pu; ++j) {
+				float pl = su_pu_pls[std::make_pair((*pus)[j].pl_id, (*sus)[i].pl_id)];
+				(*gt_su_pu_pl)[i].push_back(pl);
 			}
 		}
 	}

@@ -199,7 +199,8 @@ public:
 			const std::vector<PU>& input_pus, const std::vector<SS>& sss,
 			Timer* timer,
 			PathLossTable* path_loss_table,
-			std::vector<std::vector<float> >* rp_at_ss_from_pu_pt) const;
+			std::vector<std::vector<float> >* rp_at_ss_from_pu_pt,
+			std::vector<std::vector<float> >* su_pu_pl) const;
 
 	void plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,
 			std::map<int, std::vector<int> >* pu_int_groups, std::map<int, std::vector<int> >* ss_int_groups) const;
@@ -208,7 +209,8 @@ public:
 							std::vector<PU*>& pus,
 							const std::vector<const SS*>& sss,
 							const std::vector<std::vector<float> >& received_powers,
-							PathLossTable* path_loss_table) const;
+							PathLossTable* path_loss_table,
+							std::vector<float>* this_su_pu_pl) const;
 
 	bool useGrid() const { return sm_params->use_grid; }
 
