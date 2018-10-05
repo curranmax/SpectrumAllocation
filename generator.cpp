@@ -437,11 +437,10 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		pm->loadANOFile(pus[j]);
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			float path_loss = pm->getPathLoss(pus[j].loc, sss[i].loc);
-			// std::cout << path_loss << std::endl;
 			out << "PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
 
-		for(unsigned int i = 0; i < sus.size(); ++j) {
+		for(unsigned int i = 0; i < sus.size(); ++i) {
 			float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
 			out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}

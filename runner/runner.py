@@ -573,7 +573,7 @@ if __name__ == '__main__':
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
-					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data1.txt'],
+					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_full1.txt'],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
@@ -632,8 +632,8 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [100], 'num_pr_per_pu' : [10], 'pr_range': [100.0],
-							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+			changes.append({'num_pu': [4], 'num_ss': [40], 'num_su': [10], 'num_pr_per_pu' : [5], 'pr_range': [10.0],
+							'location_range': [1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/data_full1.txt']})
 		if experiment == DENSITY_TEST:
