@@ -271,7 +271,7 @@ int main(int argc, char const *argv[]) {
 		}
 		std::cout << std::endl;
 
-		/*std::cout << "path_loss(plain,ground)|list(float,float)|";
+		std::cout << "path_loss(plain,ground)|list(float,float)|";
 		unsigned int x = 0;
 		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
 			if(itr->first.pr_ind == -1) {
@@ -290,25 +290,6 @@ int main(int argc, char const *argv[]) {
 			++x;
 		}
 		std::cout << std::endl;
-
-		std::cout << "pu_path_loss(plain,ground)|list(float,float)|";
-		x = 0;
-		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-			if(itr->first.pr_ind != -1) {
-				continue;
-			}
-
-			if(!itr->second.pt_set || !itr->second.gt_set) {
-				continue;
-			}
-
-			std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
-			if(x < path_loss_table.table.size() - 1) {
-				std::cout << ",";
-			}
-			++x;
-		}
-		std::cout << std::endl;*/
 
 		if(!args.skip_s2pc) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
