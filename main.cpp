@@ -70,14 +70,19 @@ int main(int argc, char const *argv[]) {
 
 	PathLossTable path_loss_table;
 	std::vector<std::vector<float> > rp_at_ss_from_pu, rp_at_ss_from_pu_pt;
+	std::vector<std::vector<float> > gt_su_pu_pl, pt_su_pu_pl; // gt_su_pu_pl[i][j] is the GT path loss between SU i and PU j
 	if(args.in_filename == "") {
-		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &path_loss_table);
+		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &gt_su_pu_pl);
 	} else {
-		gen.getEntitiesFromFile(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.in_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &path_loss_table);
+		gen.getEntitiesFromFile(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.in_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &gt_su_pu_pl);
 	}
 
 	if(args.use_gt_rp_at_ss_from_pu) {
 		rp_at_ss_from_pu_pt = rp_at_ss_from_pu;
+	}
+
+	if(args.use_gt_su_pu_pl) {
+		pt_su_pu_pl = gt_su_pu_pl;
 	}
 	
 	// Set up Spectrum Manager params
@@ -238,7 +243,7 @@ int main(int argc, char const *argv[]) {
 		su_thrd.join();
 	}
 
-	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_pt);
+	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_pt, &pt_su_pu_pl);
 	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table, args.no_pr_thresh_update);
 
 	std::vector<float> secure_vs;
@@ -266,44 +271,25 @@ int main(int argc, char const *argv[]) {
 		}
 		std::cout << std::endl;
 
-		// std::cout << "path_loss(plain,ground)|list(float,float)|";
-		// unsigned int x = 0;
-		// for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-		// 	if(itr->first.pr_ind == -1) {
-		// 		continue;
-		// 	}
+		std::cout << "path_loss(plain,ground)|list(float,float)|";
+		unsigned int x = 0;
+		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
+			if(itr->first.pr_ind == -1) {
+				continue;
+			}
 
-		// 	if(!itr->second.pt_set || !itr->second.gt_set) {
-		// 		std::cerr << "Path loss not set" << std::endl;
-		// 		exit(1);
-		// 	}
+			if(!itr->second.pt_set || !itr->second.gt_set) {
+				std::cerr << "Path loss not set" << std::endl;
+				exit(1);
+			}
 
-		// 	std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
-		// 	if(x < path_loss_table.table.size() - 1) {
-		// 		std::cout << ",";
-		// 	}
-		// 	++x;
-		// }
-		// std::cout << std::endl;
-
-		// std::cout << "pu_path_loss(plain,ground)|list(float,float)|";
-		// x = 0;
-		// for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-		// 	if(itr->first.pr_ind != -1) {
-		// 		continue;
-		// 	}
-
-		// 	if(!itr->second.pt_set || !itr->second.gt_set) {
-		// 		continue;
-		// 	}
-
-		// 	std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
-		// 	if(x < path_loss_table.table.size() - 1) {
-		// 		std::cout << ",";
-		// 	}
-		// 	++x;
-		// }
-		// std::cout << std::endl;
+			std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
+			if(x < path_loss_table.table.size() - 1) {
+				std::cout << ",";
+			}
+			++x;
+		}
+		std::cout << std::endl;
 
 		if(!args.skip_s2pc) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;

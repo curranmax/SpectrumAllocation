@@ -40,6 +40,7 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&skip_s2pc, "-skip_s2pc", "If given, skips the secure algorithm and only runs the plaintext algo."),
 			Arg_Val(&central_entities, "two_sms", "-ces", "CENTRAL_ENTITIES", "The central entities that will run the secure algorithm. Must be 'two_sms', or 'sm_ks'"),
 			Arg_Val(&use_gt_rp_at_ss_from_pu, "-use_gt_rp", "If given, then the plaintext algorithm will use the real RP at each SS from PU instead of splitting the total using IDW."),
+			Arg_Val(&use_gt_su_pu_pl, "-use_gt_su_pu_pl", "If given, then the plaintext algorithm will use the real path loss between the SU and PU."),
 			Arg_Val(&num_pu, 1, "-npu", "NUM_PU", "Number of Primary Users to generate."),
 			Arg_Val(&num_ss, 1, "-nss", "NUM_SS", "Number of Spectrum Sensors to generate."),
 			Arg_Val(&num_su, 1, "-nsu", "NUM_SU", "Number of Secondary Users to generate."),
