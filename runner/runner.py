@@ -648,7 +648,7 @@ if __name__ == '__main__':
 			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [200], 'num_pr_per_pu' : [5], 'pr_range': [10.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['../gen_out/data_full1.txt']})
+							'out_filename': ['../gen_out/data_same_height.txt']})
 		if experiment == DENSITY_TEST:
 			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
