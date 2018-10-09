@@ -1917,7 +1917,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	}
 	std::vector<float> all_vals;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		std::cout << "Starting PT request for SU " << i << std::endl;
+		// std::cout << "Starting PT request for SU " << i << std::endl;
 		if(sm_params->use_grid) {
 			sel_pus.clear();
 			sel_sss.clear();
@@ -1949,8 +1949,10 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 			this_rps = rp_itr->second;
 		}
 		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
+
+		// std::cout << "PT Max SU TP: " << v << std::endl;
 		all_vals.push_back(v);
-		std::cout << "Finished PT request for SU " << i << std::endl;
+		// std::cout << "Finished PT request for SU " << i << std::endl;
 	}
 
 	P("end PlaintextSpectrumManager::plainTextRun");
@@ -2149,19 +2151,18 @@ float PlaintextSpectrumManager::plainTextRadar(
 		}
 		
 		float this_pu_path_loss = sum_weighted_ratio / sum_weight;
-
 		if(read_su_pu_pl) {
 			this_pu_path_loss = (*this_su_pu_pl)[j];
 		} else {
 			(*this_su_pu_pl)[j] = this_pu_path_loss;
+			path_loss_table->addPlaintextPathLoss(su.index, pus[j]->index, this_pu_path_loss);
 		}
-
 
 		estimated_path_loss.push_back(std::vector<float>());
 		for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
 			float this_pr_path_loss = this_pu_path_loss + 10.0 * sm_params->pl_est_gamma * log10(su.loc.dist(pus[j]->prs[x].loc) / su.loc.dist(pus[j]->loc));
 
-			path_loss_table->addPlaintextPathLoss(su.index, j, x, this_pr_path_loss);
+			path_loss_table->addPlaintextPathLoss(su.index, pus[j]->index, x, this_pr_path_loss);
 			estimated_path_loss[y].push_back(this_pr_path_loss);
 			
 			float this_transmit_power;
@@ -2183,6 +2184,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 		}
 	}
 
+	// Update PR thresholds
 	if(!(sm_params->no_pr_thresh_update)) {
 		float actual_su_tp = max_transmit_power + su.less_max_tp;
 		bool is_su_transmitting = actual_su_tp > su.min_tp;
@@ -2199,6 +2201,20 @@ float PlaintextSpectrumManager::plainTextRadar(
 
 					float new_value = utils::todBm(utils::fromdBm(pus[j]->prs[x].threshold) - utils::fromdBm(rp));
 					
+					if(new_value == -std::numeric_limits<float>::infinity()) {
+						std::cout << "---------------------" << std::endl;
+						std::cout << max_transmit_power << " " << su.less_max_tp << " " << actual_su_tp << " " << su.min_tp << " " << is_su_transmitting << std::endl;
+						std::cout << estimated_path_loss[y][x] << " " << rp << std::endl;
+						std::cout << utils::fromdBm(rp) << " " << pus[j]->prs[x].threshold << " " << utils::fromdBm(pus[j]->prs[x].threshold) << utils::todBm(utils::fromdBm(pus[j]->prs[x].threshold) - utils::fromdBm(rp)) << std::endl;
+
+						std::cout << new_value << std::endl;
+						std::cout << "---------------------" << std::endl;
+
+
+						std::cerr << "New PR threshold is: " << new_value << std::endl;
+						exit(1);
+					}
+
 					pus[j]->prs[x].threshold = new_value;
 				}
 			}

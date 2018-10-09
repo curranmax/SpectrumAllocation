@@ -116,6 +116,10 @@ def plotData(data, reduce_function = None, include_errbars = False, scatter_plot
 		_xvs = [x for x in sorted(data[group])]
 		_yvs = [reduce_function(data[group][xv]) for xv in _xvs]
 
+		if group == (True, True):
+			for xv in _xvs:
+				print xv, data[group][xv]
+
 		xvs = []
 		yvs = []
 		for xv, yv in zip(_xvs, _yvs):
@@ -300,8 +304,11 @@ def getYLabel(yv):
 		print 'Unrecognized yv:', yv
 		return str(yv)
 
-cdf_labels = {'path_loss_error': 'Path Loss Error (Plain - Ground)',
-				'abs_path_loss_error': 'Abs Path Loss Error'}
+cdf_labels = {'su_pr_path_loss_error': 'SU-PR Path Loss Error (Plain - Ground) in dB',
+				'su_pr_abs_path_loss_error': 'Abs SU-PR Path Loss Error',
+				'su_pu_path_loss_error': 'SU-PU Path Loss Error (Plain - Ground) in dB',
+				'su_pu_abs_path_loss_error': 'Abs SU-PU Path Loss Error',
+				'rp_split_dif': 'dB Error in split SS receive power (Plain - Ground)'}
 
 def getCdfLabel(cdfv):
 	if cdfv in cdf_labels:
@@ -321,7 +328,8 @@ if __name__ == '__main__':
 				('location_range', 'lr'), ('ld_path_loss0', 'ld_pl0'), ('ld_dist0', 'ld_d0'),
 				('num_ss_selection', 'nss_s'), ('num_pu_selection', 'npu_s'), ('ss_receive_power_alpha', 'rpa'), ('ss_path_loss_alpha', 'pla'),
 				('num_float_bits', 'nfb'), ('s2_pc_bit_count', 'bc'),
-				('grid_x', 'gx'), ('grid_y', 'gy')]
+				('grid_x', 'gx'), ('grid_y', 'gy'),
+				('pl_est_gamma', 'plg')]
 	for full_xv, short_xv in x_values:
 		parser.add_argument('-x_' + short_xv, '--use_' + full_xv + '_for_x_value', action = 'store_true', help = 'If given, uses ' + full_xv + ' for the x dimension.')
 
@@ -336,13 +344,17 @@ if __name__ == '__main__':
 		parser.add_argument('-y_' + short_yv, '--use_' + full_yv + '_for_y_value', action = 'store_true', help = 'If given, uses ' + full_yv + ' for the y dimension.')
 
 	# CDF values. If given, then cannot give an x or y value.
-	cdf_values = [('path_loss_error', 'ple'), ('abs_path_loss_error', 'aple')]
+	cdf_values = [('su_pr_path_loss_error', 'pr_ple'), ('su_pr_abs_path_loss_error', 'pr_aple'),
+					('su_pu_path_loss_error', 'pu_ple'), ('su_pu_abs_path_loss_error', 'pu_aple'),
+					('rp_split_dif', 'rsd')]
 	for full_cdfv, short_cdfv in cdf_values:
 		parser.add_argument('-cdf_' + short_cdfv, '--use_' + full_cdfv + '_for_cdf_value', action = 'store_true', help = 'If given, uses ' + full_cdfv + ' to make a cdf plot.')
 
 
 	# Group values
-	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('secure_write_algo', 'swa'), ('central_entities', 'ces'), ('use_gt_rp_at_ss_from_pu', 'use_gt_rp')]
+	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'),
+							('secure_write_algo', 'swa'), ('central_entities', 'ces'),
+							('use_gt_rp_at_ss_from_pu', 'use_gt_rp'), ('use_gt_su_pu_pl', 'use_gt_su_pu_pl')]
 	for full_gv, short_gv in g_values:
 		parser.add_argument('-g_' + short_gv, '--use_' + full_gv + '_for_group_value', action = 'store_true', help = 'If given, uses ' + full_gv + ' for grouping data.')
 
@@ -364,6 +376,10 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	raw_values = readInParamResult(args.in_files)
+
+	for param, result in raw_values:
+		if float('-inf') in result.su_transmit_power['plain']:
+			print result.rand_seed
 
 	xv = None
 	xfunc = None
@@ -406,10 +422,16 @@ if __name__ == '__main__':
 	cdfv = None
 	cdffunc = None
 
-	complex_cdf_values = {'path_loss_error': (('path_loss', 'plain'), ('path_loss', 'ground'), 'unit_type'),
-							'abs_path_loss_error': (('path_loss', 'plain'), ('path_loss', 'ground'), 'unit_type')}
-	complex_cdf_funcs = {'path_loss_error': pathLossError,
-							'abs_path_loss_error': lambda x: abs(pathLossError(*x))}
+	complex_cdf_values = {'su_pr_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type'),
+							'su_pr_abs_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type'),
+							'su_pu_path_loss_error': (('su_pu_path_loss', 'plain'), ('su_pu_path_loss', 'ground'), 'unit_type'),
+							'su_pu_abs_path_loss_error': (('su_pu_path_loss', 'plain'), ('su_pu_path_loss', 'ground'), 'unit_type'),
+							'rp_split_dif': ('rp_at_ss_from_pu', 'rp_at_ss_from_pu_pt', 'unit_type')}
+	complex_cdf_funcs = {'su_pr_path_loss_error': pathLossError,
+							'su_pr_abs_path_loss_error': lambda x: abs(pathLossError(*x)),
+							'su_pu_path_loss_error': pathLossError,
+							'su_pu_abs_path_loss_error': lambda x: abs(pathLossError(*x)),
+							'rp_split_dif': dbDifference}
 
 	this_cdf_value = None
 

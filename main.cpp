@@ -246,6 +246,15 @@ int main(int argc, char const *argv[]) {
 	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_pt, &pt_su_pu_pl);
 	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table, args.no_pr_thresh_update);
 
+	{
+		// Add ground truth SU-PU path losses to the path loss table
+		for(unsigned int i = 0; i < gt_su_pu_pl.size(); ++i) {
+			for(unsigned int j = 0; j < gt_su_pu_pl[i].size(); ++j) {
+				path_loss_table.addGroundTruthPathLoss(i, j, gt_su_pu_pl[i][j]);
+			}
+		}
+	}
+
 	std::vector<float> secure_vs;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		if(!args.skip_s2pc) {
@@ -271,13 +280,10 @@ int main(int argc, char const *argv[]) {
 		}
 		std::cout << std::endl;
 
-		std::cout << "path_loss(plain,ground)|list(float,float)|";
+		if(path_loss_table.table.size() > 0)
+		std::cout << "su_pr_path_loss(plain,ground)|list(float,float)|";
 		unsigned int x = 0;
 		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-			if(itr->first.pr_ind == -1) {
-				continue;
-			}
-
 			if(!itr->second.pt_set || !itr->second.gt_set) {
 				std::cerr << "Path loss not set" << std::endl;
 				exit(1);
@@ -290,6 +296,24 @@ int main(int argc, char const *argv[]) {
 			++x;
 		}
 		std::cout << std::endl;
+
+		if(path_loss_table.pu_table.size() > 0) {
+			std::cout << "su_pu_path_loss(plain,ground)|list(float,float)|";
+			unsigned int x = 0;
+			for(auto itr = path_loss_table.pu_table.begin(); itr != path_loss_table.pu_table.end(); ++itr) {
+				if(!itr->second.pt_set || !itr->second.gt_set) {
+					std::cerr << "Path loss not set" << std::endl;
+					exit(1);
+				}
+
+				std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
+				if(x < path_loss_table.pu_table.size() - 1) {
+					std::cout << ",";
+				}
+				++x;
+			}
+			std::cout << std::endl;
+		}
 
 		if(!args.skip_s2pc) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;

@@ -104,6 +104,8 @@ def makeDefaultExperimentParam():
 	param.num_float_bits = 16
 	param.s2_pc_bit_count = 64
 
+	param.pl_est_gamma = 1.0
+
 	return param
 
 class ExperimentParam:
@@ -163,6 +165,8 @@ class ExperimentParam:
 		self.num_float_bits = None
 		self.s2_pc_bit_count = None
 
+		self.pl_est_gamma = None
+
 	def getValue(self, yv):
 		return getattr(self, yv)
 
@@ -187,7 +191,8 @@ class ExperimentResult:
 		self.rand_seed = None
 		self.time_per_request = None
 		self.secure_write_time = None
-		self.path_loss = None
+		self.su_pr_path_loss = None
+		self.su_pu_path_loss = None
 
 		self.rp_at_ss_from_pu = None
 		self.rp_at_ss_from_pu_pt = None
@@ -343,7 +348,8 @@ def runExperiment(param, no_run = False, debug_print = False):
 			'selection_algo': 'sel_algo', 'secure_write_algo': 'sec_write_algo',
 			'grid_x': 'grid_x', 'grid_y': 'grid_y',
 			'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
-			'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count'}
+			'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count',
+			'pl_est_gamma': 'plg'}
 
 	# Check that all attrs have flags
 	vs = []
@@ -588,13 +594,18 @@ if __name__ == '__main__':
 			# secure_read_algo_test
 			secure_write_algo_test = deepcopy(default_values)
 
+			pr_gamma_test = deepcopy(default_values)
+
 			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
 			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
 			num_bits_test[('s2_pc_bit_count', 'num_float_bits')] = [(32, 8), (48, 12), (64, 16)]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
 
-			changes += [num_ss_s_test] # , num_pu_s_test, num_bits_test] # , secure_write_algo_test]
+			pr_gamma_test['pl_est_gamma'] = [0.1, 0.5, 1.0, 2.0, 4.0, 16.0]
+			pr_gamma_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(True, True)]
+
+			changes += [pr_gamma_test] # [num_ss_s_test , num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],

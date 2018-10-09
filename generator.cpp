@@ -29,7 +29,7 @@ void Generator::generateEntities(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string & out_filename,
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
 		std::vector<std::vector<float> >* rp_at_ss_from_pu, std::vector<std::vector<float> >* gt_su_pu_pl) const {
-	const float pr_height = (num_pr_per_pu == 1 ? pu_height : ss_height);
+	const float pr_height = (num_pr_per_pu == 1 ? pu_height : pu_height);
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
 		if(out_filename != "") {
@@ -67,8 +67,11 @@ void Generator::generateEntities(
 			exit(1);
 		}
 
-		// PRs
 		PU pu(Location(pu_x, pu_y, pu_height), transmit_power);
+
+		pu.index = j;
+		
+		// PRs
 		for(int x = 0; x < num_pr_per_pu; ++x) {
 			Location pr_loc;
 			if(num_pr_per_pu > 1) {
@@ -365,6 +368,10 @@ void Generator::getEntitiesFromFile(
 		exit(1);
 	}
 
+	for(unsigned int j = 0; j < pus->size(); ++j) {
+		(*pus)[j].index = j;
+	}
+
 	// SS
 	if(int(all_sss.size()) > num_ss) {
 		std::shuffle(all_sss.begin(), all_sss.end(), std::default_random_engine(time(nullptr)));
@@ -393,6 +400,8 @@ void Generator::getEntitiesFromFile(
 
 	// Set su.index
 	for(unsigned int i = 0; i < sus->size(); ++i) {
+		(*sus)[i].less_max_tp = utils::randomFloat(-2.5, -10.0);
+		(*sus)[i].min_tp = -100.0;
 		(*sus)[i].index = i;
 	}
 

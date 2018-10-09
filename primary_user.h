@@ -123,15 +123,16 @@ public:
 
 class PrimaryUser {
 public:
-	PrimaryUser() : loc(), transmit_power(0.0), prs(), splat_ano_filename("") {}
-	PrimaryUser(const Location& _loc, float _transmit_power) : loc(_loc), transmit_power(_transmit_power), prs(), splat_ano_filename("") {}
+	PrimaryUser() : index(-1), loc(), transmit_power(0.0), prs(), splat_ano_filename("") {}
+	PrimaryUser(const Location& _loc, float _transmit_power) : index(-1), loc(_loc), transmit_power(_transmit_power), prs(), splat_ano_filename("") {}
 	PrimaryUser(const Location& _loc, float _transmit_power, float _threshold) :
-			loc(_loc), transmit_power(_transmit_power),
+			index(-1), loc(_loc), transmit_power(_transmit_power),
 			prs({PrimaryReceiver(_loc, _threshold)}),
 			splat_ano_filename("") {}
-	PrimaryUser(const PrimaryUser& pu) : loc(pu.loc), transmit_power(pu.transmit_power), prs(pu.prs), splat_ano_filename(pu.splat_ano_filename), pl_id(pu.pl_id) {}
+	PrimaryUser(const PrimaryUser& pu) : index(pu.index), loc(pu.loc), transmit_power(pu.transmit_power), prs(pu.prs), splat_ano_filename(pu.splat_ano_filename), pl_id(pu.pl_id) {}
 
 	const PrimaryUser& operator=(const PrimaryUser& pu) {
+		this->index = index;
 		this->loc = pu.loc;
 		this->transmit_power = pu.transmit_power;
 		this->prs = pu.prs;
@@ -139,6 +140,8 @@ public:
 		this->pl_id = pu.pl_id;
 		return *this;
 	}
+
+	int index;
 
 	Location loc;
 

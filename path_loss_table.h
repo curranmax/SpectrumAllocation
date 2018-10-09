@@ -85,8 +85,23 @@ public:
 		return table[key].setGroundTruthPathLoss(path_loss);
 	}
 
+	// All pt path losses get added
+	bool addPlaintextPathLoss(int su_ind, int pu_ind, float path_loss) {
+		return pu_table[PLTKey(su_ind, pu_ind, -1)].setPlaintextPathLoss(path_loss);
+	}
+
+	// Only add gt path losses, if there is already an entry in the table from pt.
+	bool addGroundTruthPathLoss(int su_ind, int pu_ind, float path_loss) {
+		PLTKey key(su_ind, pu_ind, -1);
+		if(pu_table.count(key) <= 0) {
+			return false;
+		}
+		return pu_table[key].setGroundTruthPathLoss(path_loss);
+	}
+
 	// (SU, PR) -> (pt path loss, gt path loss)
 	std::map<PLTKey, PLTValue> table;
+	std::map<PLTKey, PLTValue> pu_table;
 };
 
 #endif
