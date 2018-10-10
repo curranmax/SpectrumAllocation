@@ -30,6 +30,7 @@ void Generator::generateEntities(
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
 		std::vector<std::vector<float> >* rp_at_ss_from_pu, std::vector<std::vector<float> >* gt_su_pu_pl) const {
 	const float pr_height = (num_pr_per_pu == 1 ? pu_height : pu_height);
+
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
 		if(out_filename != "") {
@@ -455,6 +456,10 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		// std::cout << "Outputting PU " << j + 1 << " of " << pus.size() << std::endl;
 		out << "PU " << j << " " << pus[j].loc.x << " " << pus[j].loc.y << " " << pus[j].loc.z << " " << pus[j].transmit_power << std::endl;
 		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
+			if(pus[j].prs[x].loc.z != pus[j].loc.z) {
+				std::cerr << "PU and PR have different heights" << std::endl;
+				exit(1);
+			}
 			out << "PR " << j << " " << x << " " << pus[j].prs[x].loc.x << " " << pus[j].prs[x].loc.y << " " << pus[j].prs[x].loc.z << " " << pus[j].prs[x].threshold << std::endl;
 		}
 	}
