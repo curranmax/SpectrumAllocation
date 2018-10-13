@@ -1248,7 +1248,7 @@ float SpectrumManager::secureRadar(
 
 			sInt log_dist_ratio;
 			utils::secureLog10_v2(&log_dist_ratio, dist_ratio, parties, sm_params->bit_count, sm_params->factor, factor_int);
-			sInt pr_est_path_loss = pu_est_path_loss + ten * pl_est_gamma * (log_dist_ratio - secure_log_dr_scale) / two / factor_int;
+			sInt pr_est_path_loss = pu_est_path_loss - ten * pl_est_gamma * (log_dist_ratio - secure_log_dr_scale) / two / factor_int;
 
 			sInt this_su_tp;
 			if(utils::unit_type == utils::UnitType::ABS) {
@@ -2152,15 +2152,14 @@ float PlaintextSpectrumManager::plainTextRadar(
 		
 		float this_pu_path_loss = sum_weighted_ratio / sum_weight;
 		if(read_su_pu_pl) {
-			this_pu_path_loss = (*this_su_pu_pl)[j];
+			this_pu_path_loss = (*this_su_pu_pl)[pus[j]->index];
 		} else {
-			(*this_su_pu_pl)[j] = this_pu_path_loss;
 			path_loss_table->addPlaintextPathLoss(su.index, pus[j]->index, this_pu_path_loss);
 		}
 
 		estimated_path_loss.push_back(std::vector<float>());
 		for(unsigned int x = 0; x < pus[j]->prs.size(); ++x) {
-			float this_pr_path_loss = this_pu_path_loss + 10.0 * sm_params->pl_est_gamma * log10(su.loc.dist(pus[j]->prs[x].loc) / su.loc.dist(pus[j]->loc));
+			float this_pr_path_loss = this_pu_path_loss - 10.0 * sm_params->pl_est_gamma * log10(su.loc.dist(pus[j]->prs[x].loc) / su.loc.dist(pus[j]->loc));
 
 			path_loss_table->addPlaintextPathLoss(su.index, pus[j]->index, x, this_pr_path_loss);
 			estimated_path_loss[y].push_back(this_pr_path_loss);

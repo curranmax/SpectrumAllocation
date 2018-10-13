@@ -377,6 +377,14 @@ if __name__ == '__main__':
 
 	raw_values = readInParamResult(args.in_files)
 
+	if args.in_files == 'data/out_Oct-09_13:31:05_alpha_test.txt':
+		nrv = {}
+		for param, result in raw_values:
+			if param.ss_receive_power_alpha not in nrv:
+				nrv[param.ss_receive_power_alpha] = (param, result)
+
+		raw_values = [v for _, v in nrv.iteritems()]
+
 	for param, result in raw_values:
 		if float('-inf') in result.su_transmit_power['plain']:
 			print result.rand_seed

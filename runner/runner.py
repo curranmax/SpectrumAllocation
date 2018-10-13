@@ -547,9 +547,9 @@ if __name__ == '__main__':
 			rp_alphas += [4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0]
 			rp_alphas += [6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0]
 			rp_alphas += [8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9.0, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0]
-			files = ['../gen_out/data3.txt']
+			files = ['../gen_out/data1.txt']
 			grid_size = 100
-			n_sel = 10
+			n_sel = 25
 
 			# TODO if tests are quick, run for all three data files.
 
@@ -581,12 +581,13 @@ if __name__ == '__main__':
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
-					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_full1.txt'],
+					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_same_height.txt'],
+					# 'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
-					PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
 					'no_pr_thresh_update': [False],
-					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(False, False), (True, False), (True, True)]}
+					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(True, True)]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
@@ -594,6 +595,8 @@ if __name__ == '__main__':
 			# secure_read_algo_test
 			secure_write_algo_test = deepcopy(default_values)
 
+			rp_test = deepcopy(default_values)
+			pl_alpha_test = deepcopy(default_values)
 			pr_gamma_test = deepcopy(default_values)
 
 			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
@@ -601,11 +604,22 @@ if __name__ == '__main__':
 			num_bits_test[('s2_pc_bit_count', 'num_float_bits')] = [(32, 8), (48, 12), (64, 16)]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
+			
+			rp_test[RP_ALPHA] = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0]
+			rp_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(False, False)]
+			rp_test['skip_s2pc'] = [True]
+
+			pl_alpha_test[PL_ALPHA] = [0.1, 0.5, 1.0, 2.0, 4.0, 8.0]
+			pl_alpha_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(False, False), (True, False)]
+			pl_alpha_test['skip_s2pc'] = [True]
 
 			pr_gamma_test['pl_est_gamma'] = [0.1, 0.5, 1.0, 2.0, 4.0, 16.0]
 			pr_gamma_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(True, True)]
+			pr_gamma_test['skip_s2pc'] = [True]
+			pr_gamma_test['in_filename'] = ['../gen_out/data_same_height.txt']
 
-			changes += [pr_gamma_test] # [num_ss_s_test , num_pu_s_test, num_bits_test] # , secure_write_algo_test]
+			# changes += [pr_gamma_test]
+			changes += [num_ss_s_test] #, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
@@ -645,10 +659,10 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [200], 'num_pr_per_pu' : [5], 'pr_range': [10.0],
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [5], 'pr_range': [100.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['../gen_out/data_same_height.txt']})
+							'out_filename': ['../gen_out/data_sh_2.txt']})
 		if experiment == DENSITY_TEST:
 			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
