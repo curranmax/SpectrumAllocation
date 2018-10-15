@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <math.h>
+#include <set>
 #include <string>
 
 using namespace osuCrypto;
@@ -1807,7 +1808,9 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
 	std::vector<std::vector<float> > received_powers;
 	if(rp_at_ss_from_pu_pt->size() == 0) {
+		P("start PT split RP");
 		for(unsigned int i = 0; i < sss.size(); ++i) {
+			P("PT splitting SS " + std::to_string(i) + " RP");
 			std::vector<float> rp_weights;
 			float sum_rp_weights = 0.0;
 			for(unsigned int j = 0; j < pus.size(); ++j) {
@@ -1828,16 +1831,22 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 				}
 			}
 		}
+		P("end PT split RP");
 
-		rp_at_ss_from_pu_pt->clear(); // rp_at_ss_from_pu_pt[j][i] is the estimated received power at SS i from PU j
-		for(unsigned int j = 0; j < pus.size(); ++j) {
-			rp_at_ss_from_pu_pt->push_back(std::vector<float>());
-			for(unsigned int i = 0; i < sss.size(); ++i) {
-				(*rp_at_ss_from_pu_pt)[j].push_back(received_powers[i][j]);
+		if(sm_params->pt_record_split_power){
+			P("start recording split power");
+			rp_at_ss_from_pu_pt->clear(); // rp_at_ss_from_pu_pt[j][i] is the estimated received power at SS i from PU j
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				P("recording split power PU " + std::to_string(j));
+				rp_at_ss_from_pu_pt->push_back(std::vector<float>());
+				for(unsigned int i = 0; i < sss.size(); ++i) {
+					(*rp_at_ss_from_pu_pt)[j].push_back(received_powers[i][j]);
+				}
 			}
+			P("end recording split power");
 		}
 	} else {
-		std::cout << "Using GT rp_at_ss_from_pu_pt" << std::endl;
+		P("start using split RP from GT");
 		if(rp_at_ss_from_pu_pt->size() != pus.size()) {
 			std::cerr << "GT rps don't match the number of pus" << std::endl;
 			exit(1);
@@ -1856,39 +1865,98 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 				received_powers[i].push_back((*rp_at_ss_from_pu_pt)[j][i]);
 			}
 		}
+		P("end using split RP from GT");
 	}
 
 	std::map<int, std::vector<PU*> > pu_groups;
 	std::map<int, std::vector<const SS*> > ss_groups;
 	std::map<int, std::vector<std::vector<float> > > rp_powers_groups;
 	if(sm_params->use_grid) {
-		std::map<int, std::vector<int> > pu_int_groups;
-		std::map<int, std::vector<int> > ss_int_groups;
-		plainTextGrid(pus, sss, &pu_int_groups, &ss_int_groups);
-
-		for(auto itr = pu_int_groups.begin(); itr != pu_int_groups.end(); ++itr) {
-			for(unsigned int i = 0; i < itr->second.size(); ++i) {
-				pu_groups[itr->first].push_back(&(pus[itr->second[i]]));
+		bool only_su_groups = true;
+		std::set<int> su_group_ids;
+		if(only_su_groups) {
+			for(unsigned int i = 0; i < sus.size(); ++i) {
+				int group_id = int(sus[i].loc.x / sm_params->grid_delta_x) + int(sus[i].loc.y / sm_params->grid_delta_y) * sm_params->grid_num_x;
+				su_group_ids.insert(group_id);
 			}
+
+			P("Only using " + std::to_string(su_group_ids.size()) + " groups in PT");
 		}
 
-		for(auto itr = ss_int_groups.begin(); itr != ss_int_groups.end(); ++itr) {
-			for(unsigned int i = 0; i < itr->second.size(); ++i) {
-				ss_groups[itr->first].push_back(&(sss[itr->second[i]]));
+		std::map<int, std::vector<int> > pu_int_groups;
+		std::map<int, std::vector<int> > ss_int_groups;
+		
+		P("start PT grid calc");
+		plainTextGrid(pus, sss, &pu_int_groups, &ss_int_groups);
+		P("end PT grid calc");
 
-				rp_powers_groups[itr->first].push_back(std::vector<float>());
-
-				auto pu_itr = pu_int_groups.find(itr->first);
+		P("start creating PU group");
+		if(only_su_groups) {
+			for(auto g_itr = su_group_ids.begin(); g_itr != su_group_ids.end(); ++g_itr) {
+				auto pu_itr = pu_int_groups.find(*g_itr);
 				if(pu_itr == pu_int_groups.end()) {
-					std::cerr << "Error with rp and groups in PT" << std::endl;
+					std::cerr << "Invalid group_id: " << *g_itr << std::endl;
 					exit(1);
 				}
 
-				for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
-					rp_powers_groups[itr->first][i].push_back(received_powers[itr->second[i]][pu_itr->second[j]]);
+				for(unsigned int i = 0; i < pu_itr->second.size(); ++i) {
+					pu_groups[pu_itr->first].push_back(&(pus[pu_itr->second[i]]));
+				}
+			}
+		} else {
+			for(auto itr = pu_int_groups.begin(); itr != pu_int_groups.end(); ++itr) {
+				for(unsigned int i = 0; i < itr->second.size(); ++i) {
+					pu_groups[itr->first].push_back(&(pus[itr->second[i]]));
 				}
 			}
 		}
+		P("end creating PU group");
+
+		P("start creating SS group");
+		if(only_su_groups) {
+			for(auto g_itr = su_group_ids.begin(); g_itr != su_group_ids.end(); ++g_itr) {
+				auto ss_itr = ss_int_groups.find(*g_itr);
+				if(ss_itr == ss_int_groups.end()) {
+					std::cerr << "Invalid group_id: " << *g_itr << std::endl;
+					exit(1);
+				}
+
+				for(unsigned int i = 0; i < ss_itr->second.size(); ++i) {
+					ss_groups[ss_itr->first].push_back(&(sss[ss_itr->second[i]]));
+
+					rp_powers_groups[ss_itr->first].push_back(std::vector<float>());
+
+					auto pu_itr = pu_int_groups.find(ss_itr->first);
+					if(pu_itr == pu_int_groups.end()) {
+						std::cerr << "Error with rp and groups in PT" << std::endl;
+						exit(1);
+					}
+
+					for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
+						rp_powers_groups[ss_itr->first][i].push_back(received_powers[ss_itr->second[i]][pu_itr->second[j]]);
+					}
+				}
+			}
+		} else {
+			for(auto itr = ss_int_groups.begin(); itr != ss_int_groups.end(); ++itr) {
+				for(unsigned int i = 0; i < itr->second.size(); ++i) {
+					ss_groups[itr->first].push_back(&(sss[itr->second[i]]));
+
+					rp_powers_groups[itr->first].push_back(std::vector<float>());
+
+					auto pu_itr = pu_int_groups.find(itr->first);
+					if(pu_itr == pu_int_groups.end()) {
+						std::cerr << "Error with rp and groups in PT" << std::endl;
+						exit(1);
+					}
+
+					for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
+						rp_powers_groups[itr->first][i].push_back(received_powers[itr->second[i]][pu_itr->second[j]]);
+					}
+				}
+			}
+		}
+		P("end creating SS group");
 	} else {
 		std::cerr << "Not using grid is not supported" << std::endl;
 		exit(1);
@@ -1917,8 +1985,10 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	}
 	std::vector<float> all_vals;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		// std::cout << "Starting PT request for SU " << i << std::endl;
+		P("start PT SU " + std::to_string(i) + " request");
+
 		if(sm_params->use_grid) {
+			P("start get from grid PT");
 			sel_pus.clear();
 			sel_sss.clear();
 
@@ -1947,15 +2017,115 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 			}
 
 			this_rps = rp_itr->second;
+			P("end get from grid PT");
 		}
 		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
 
 		// std::cout << "PT Max SU TP: " << v << std::endl;
 		all_vals.push_back(v);
-		// std::cout << "Finished PT request for SU " << i << std::endl;
+		
+		P("end SU " + std::to_string(i) + " request");
 	}
 
 	P("end PlaintextSpectrumManager::plainTextRun");
+	return all_vals;
+}
+
+std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt, std::vector<std::vector<float> >* su_pu_pl) const {
+	P("start PlaintextSpectrumManager::unoptimizedPlaintextRun");
+	std::vector<PU> pus = input_pus;
+
+	// Compute the share of received power for each
+	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
+	std::vector<std::vector<float> > received_powers;
+	if(rp_at_ss_from_pu_uo_pt->size() == 0) {
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			std::vector<float> rp_weights;
+			float sum_rp_weights = 0.0;
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				rp_weights.push_back(1.0 / pow(sss[i].loc.dist(pus[j].loc), sm_params->rp_alpha_f));
+				sum_rp_weights += rp_weights[j];
+			}
+
+			received_powers.push_back(std::vector<float>());
+
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				if(utils::unit_type == utils::UnitType::ABS) {
+					received_powers[i].push_back(rp_weights[j] * sss[i].received_power / sum_rp_weights);
+				} else if(utils::unit_type == utils::UnitType::DB) {
+					received_powers[i].push_back(utils::todBm(rp_weights[j] / sum_rp_weights) + sss[i].received_power);
+				} else {
+					std::cerr << "Unsupported unit_type" << std::endl;
+					exit(1);
+				}
+			}
+		}
+
+		if(sm_params->pt_record_split_power) {
+			rp_at_ss_from_pu_uo_pt->clear(); // rp_at_ss_from_pu_pt[j][i] is the estimated received power at SS i from PU j
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				rp_at_ss_from_pu_uo_pt->push_back(std::vector<float>());
+				for(unsigned int i = 0; i < sss.size(); ++i) {
+					(*rp_at_ss_from_pu_uo_pt)[j].push_back(received_powers[i][j]);
+				}
+			}
+		}
+	} else {
+		std::cout << "Using GT rp_at_ss_from_pu_pt" << std::endl;
+		if(rp_at_ss_from_pu_uo_pt->size() != pus.size()) {
+			std::cerr << "GT rps don't match the number of pus" << std::endl;
+			exit(1);
+		}
+
+		for(unsigned int j = 0; j < rp_at_ss_from_pu_uo_pt->size(); ++j) {
+			if((*rp_at_ss_from_pu_uo_pt)[j].size() != sss.size()) {
+				std::cerr << "GT rps don't match the number of sss" << std::endl;
+				exit(1);
+			}
+		}
+
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			received_powers.push_back(std::vector<float>());
+			for(unsigned int j = 0; j < pus.size(); ++j) {
+				received_powers[i].push_back((*rp_at_ss_from_pu_uo_pt)[j][i]);
+			}
+		}
+	}
+
+	if(su_pu_pl == nullptr) {
+		std::cerr << "No su_pu_pl supplied" << std::endl;
+		exit(1);
+	}
+
+	if(su_pu_pl->size() == 0) {
+		*su_pu_pl = std::vector<std::vector<float> >(sus.size());
+	}
+
+	// This is only done since the plaintext algo requires vectors of pointers.
+	std::vector<PU*> sel_pus;
+	std::vector<const SS*> sel_sss;
+	std::vector<std::vector<float> > this_rps;
+	if(!sm_params->use_grid) {
+		for(unsigned int j = 0; j < pus.size(); ++j) {
+			sel_pus.push_back(&pus[j]);
+		}
+
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			sel_sss.push_back(&sss[i]);
+		}
+	}
+
+	path_loss_table->uo_mode = true;
+
+	std::vector<float> all_vals;
+	for(unsigned int i = 0; i < sus.size(); ++i) {
+		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
+		all_vals.push_back(v);
+	}
+
+	path_loss_table->uo_mode = false;
+
+	P("end PlaintextSpectrumManager::unoptimizedPlaintextRun");
 	return all_vals;
 }
 

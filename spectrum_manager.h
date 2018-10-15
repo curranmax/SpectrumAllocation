@@ -35,7 +35,7 @@ public:
 	SMParams() = delete;
 	SMParams(float _factor, int _float_bits, int _bit_count, int _num_pu_selection, int _num_ss_selection, float _rp_alpha, float _pl_alpha, bool _brief_out) :
 			brief_out(_brief_out), factor(_factor), float_bits(_float_bits), bit_count(_bit_count), num_ss_selection(_num_ss_selection), num_pu_selection(_num_pu_selection),
-			rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), rp_alpha_f(_rp_alpha), pl_alpha_f(_pl_alpha), pl_est_gamma(0.0), no_pr_thresh_update(false), selection_algo(NONE), secure_write_algo(PROPOSED),
+			rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), rp_alpha_f(_rp_alpha), pl_alpha_f(_pl_alpha), pl_est_gamma(0.0), no_pr_thresh_update(false), pt_record_split_power(false), selection_algo(NONE), secure_write_algo(PROPOSED),
 			use_grid(false), grid_min_num_pu(0), grid_min_num_ss(0), grid_num_x(0), grid_num_y(0), grid_delta_x(0), grid_delta_y(0),
 			num_io_threads(0), server_addr(""), connection_name(""), channel_name("") {}
 
@@ -91,6 +91,7 @@ public:
 	float pl_est_gamma;
 
 	bool no_pr_thresh_update;
+	bool pt_record_split_power;
 
 	SelectionAlgo selection_algo;
 	SecureWriteAlgo secure_write_algo;
@@ -200,6 +201,13 @@ public:
 			Timer* timer,
 			PathLossTable* path_loss_table,
 			std::vector<std::vector<float> >* rp_at_ss_from_pu_pt,
+			std::vector<std::vector<float> >* su_pu_pl) const;
+
+	std::vector<float> unoptimizedPlaintextRun(
+			const std::vector<SU>& sus,
+			const std::vector<PU>& input_pus, const std::vector<SS>& sss,
+			PathLossTable* path_loss_table,
+			std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt,
 			std::vector<std::vector<float> >* su_pu_pl) const;
 
 	void plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,

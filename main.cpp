@@ -69,8 +69,8 @@ int main(int argc, char const *argv[]) {
 	std::vector<SU> sus;
 
 	PathLossTable path_loss_table;
-	std::vector<std::vector<float> > rp_at_ss_from_pu, rp_at_ss_from_pu_pt;
-	std::vector<std::vector<float> > gt_su_pu_pl, pt_su_pu_pl; // gt_su_pu_pl[i][j] is the GT path loss between SU i and PU j
+	std::vector<std::vector<float> > rp_at_ss_from_pu, rp_at_ss_from_pu_pt, rp_at_ss_from_pu_uo_pt;
+	std::vector<std::vector<float> > gt_su_pu_pl, pt_su_pu_pl, uo_pt_su_pu_pl; // gt_su_pu_pl[i][j] is the GT path loss between SU i and PU j
 	if(args.in_filename == "") {
 		gen.generateEntities(args.num_pu, args.num_ss, args.num_su, args.num_pr_per_pu, args.pr_range, args.out_filename, &pus, &sss, &sus, &rp_at_ss_from_pu, &gt_su_pu_pl);
 	} else {
@@ -78,11 +78,13 @@ int main(int argc, char const *argv[]) {
 	}
 
 	if(args.use_gt_rp_at_ss_from_pu) {
-		rp_at_ss_from_pu_pt = rp_at_ss_from_pu;
+		rp_at_ss_from_pu_uo_pt = rp_at_ss_from_pu;
+
 	}
 
 	if(args.use_gt_su_pu_pl) {
 		pt_su_pu_pl = gt_su_pu_pl;
+		uo_pt_su_pu_pl = gt_su_pu_pl;
 	}
 	
 	// Set up Spectrum Manager params
@@ -93,6 +95,7 @@ int main(int argc, char const *argv[]) {
 	sm_params.setSecureWriteAlgo(args.secure_write_algo);
 	sm_params.no_pr_thresh_update = args.no_pr_thresh_update;
 	sm_params.pl_est_gamma = args.pl_est_gamma;
+	sm_params.pt_record_split_power = args.pt_record_split_power;
 
 	if(args.grid_num_x > 0 && args.grid_num_y > 0) {
 		int k_pu = args.num_pu_selection;
@@ -113,6 +116,15 @@ int main(int argc, char const *argv[]) {
 	}
 
 	PtSM pt_sm(&sm_params);
+
+	SMParams uo_params(factor, args.num_float_bits, args.s2_pc_bit_count, 0, 0, args.ss_receive_power_alpha, args.path_loss_alpha, args.brief_out);
+	uo_params.setSelectionAlgo("none");
+
+	uo_params.no_pr_thresh_update = args.no_pr_thresh_update;
+	uo_params.pl_est_gamma = args.pl_est_gamma;
+	uo_params.pt_record_split_power = args.pt_record_split_power;
+
+	PtSM uo_pt_sm(&uo_params);
 
 	std::vector<float> secure_vs_a;
 	std::vector<float> secure_vs_b;
@@ -246,6 +258,11 @@ int main(int argc, char const *argv[]) {
 	std::vector<float> plaintext_vs = pt_sm.plainTextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_pt, &pt_su_pu_pl);
 	std::vector<float> ground_truth_vs = gen.computeGroundTruth(sus, pus, &path_loss_table, args.no_pr_thresh_update);
 
+	std::vector<float> uo_plaintext_vs;
+	if(args.run_unoptimized_plaintext) {
+		uo_plaintext_vs = uo_pt_sm.unoptimizedPlaintextRun(sus, pus, sss, &path_loss_table, &rp_at_ss_from_pu_uo_pt, &uo_pt_su_pu_pl);
+	}
+
 	{
 		// Add ground truth SU-PU path losses to the path loss table
 		for(unsigned int i = 0; i < gt_su_pu_pl.size(); ++i) {
@@ -264,38 +281,69 @@ int main(int argc, char const *argv[]) {
 	}
 
 	if(args.brief_out) {
+		std::stringstream names, types;
 		if(!args.skip_s2pc) {
-			std::cout << "su_transmit_power(secure,plain,ground)|list(float,float,float)|";
-		} else {
-			std::cout << "su_transmit_power(plain,ground)|list(float,float)|";
+			names << "secue,";
+			types << "float,";
 		}
+
+		names << "plain,";
+		types << "float,";
+
+		if(args.run_unoptimized_plaintext) {
+			names << "uo,";
+			types << "float,";
+		}
+
+		names << "ground";
+		types << "float";
+
+		std::cout << "su_transmit_power(" << names.str() << ")|list(" << types.str() << ")|";
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
 			if(!args.skip_s2pc) {
 				std::cout << secure_vs[i] << ":";
 			}
-			std::cout << plaintext_vs[i] << ":" << ground_truth_vs[i];
+
+			std::cout << plaintext_vs[i] << ":";
+
+			if(args.run_unoptimized_plaintext) {
+				std::cout << uo_plaintext_vs[i] << ":";
+			}
+
+			std::cout << ground_truth_vs[i];
 			if(i < plaintext_vs.size() - 1) {
 				std::cout << ",";
 			}
 		}
 		std::cout << std::endl;
 
-		if(path_loss_table.table.size() > 0)
-		std::cout << "su_pr_path_loss(plain,ground)|list(float,float)|";
-		unsigned int x = 0;
-		for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
-			if(!itr->second.pt_set || !itr->second.gt_set) {
-				std::cerr << "Path loss not set" << std::endl;
-				exit(1);
+		if(path_loss_table.table.size() > 0) {
+			if(args.run_unoptimized_plaintext) {
+				std::cout << "su_pr_path_loss(plain,uo,ground)|list(float,float,float)|";
+			} else {
+				std::cout << "su_pr_path_loss(plain,ground)|list(float,float)|";
 			}
+			unsigned int x = 0;
+			for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
+				if(!itr->second.pt_set || !itr->second.gt_set || (args.run_unoptimized_plaintext && !itr->second.uo_pt_set)) {
+					std::cerr << "Path loss not set" << std::endl;
+					exit(1);
+				}
 
-			std::cout << itr->second.pt_pl << ":" << itr->second.gt_pl;
-			if(x < path_loss_table.table.size() - 1) {
-				std::cout << ",";
+				std::cout << itr->second.pt_pl << ":";
+
+				if(args.run_unoptimized_plaintext) {
+					std::cout << itr->second.uo_pt_pl << ":";
+				}
+
+				std::cout << itr->second.gt_pl;
+				if(x < path_loss_table.table.size() - 1) {
+					std::cout << ",";
+				}
+				++x;
 			}
-			++x;
+			std::cout << std::endl;
 		}
-		std::cout << std::endl;
 
 		if(path_loss_table.pu_table.size() > 0) {
 			std::cout << "su_pu_path_loss(plain,ground)|list(float,float)|";
@@ -321,7 +369,7 @@ int main(int argc, char const *argv[]) {
 			std::cout << "secure_write_time|float|" << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
 		}
 
-		if(!args.use_gt_rp_at_ss_from_pu) {
+		if(!args.use_gt_rp_at_ss_from_pu && args.pt_record_split_power) {
 			std::map<int, std::vector<int> > precomputed_pu_int_groups;
 			std::map<int, std::vector<int> > precomputed_ss_int_groups;
 			pt_sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
@@ -357,6 +405,17 @@ int main(int argc, char const *argv[]) {
 			x = 0;
 			for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
 				std::cout << rp_at_ss_from_pu_pt[itr->first][itr->second];
+				if(x < relevant_ss_pu.size() - 1) {
+					std::cout << ",";
+				}
+				++x;
+			}
+			std::cout << std::endl;
+
+			std::cout << "rp_at_ss_from_pu_uo_pt|list(float)|";
+			x = 0;
+			for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
+				std::cout << rp_at_ss_from_pu_uo_pt[itr->first][itr->second];
 				if(x < relevant_ss_pu.size() - 1) {
 					std::cout << ",";
 				}

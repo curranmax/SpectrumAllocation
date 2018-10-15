@@ -65,6 +65,8 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&num_pu_selection, 0, "-npu_s", "NUM_PU_SELECTION", "For each SU request, uses only the specified number of nearby PU. A value of 0 uses all SS."),
 			Arg_Val(&do_plaintext_split, "-do_pt_split", "If given, will do preprocessing split of SS receive power in plaintext."),
 			Arg_Val(&no_pr_thresh_update, "-no_pr_up", "If given, then pr thresholds aren't updated."),
+			Arg_Val(&pt_record_split_power, "-rec_sp", "If given, records the split power of the plaintext algos"),
+			Arg_Val(&run_unoptimized_plaintext, "-uo_pt", "If given, runs the unoptimized version of the plaintext algorithm as well"),
 			Arg_Val(&selection_algo, "sort", "-sel_algo", "ALGO", "Selection Algo used for SS. Must be \"none\", \"sort\", or \"random\""),
 			Arg_Val(&secure_write_algo, "proposed", "-sec_write_algo", "ALGO", "ALgorithm for secure write. Must be either \"proposed\" or \"spc\""),
 			Arg_Val(&grid_num_x, 0, "-grid_x", "NUM_X", "The number of times to divide the x dimension"),

@@ -86,6 +86,9 @@ class Args {
 
 	bool do_plaintext_split;
 	bool no_pr_thresh_update;
+
+	bool pt_record_split_power;
+	bool run_unoptimized_plaintext;
 	
 	std::string selection_algo;
 	std::string secure_write_algo;

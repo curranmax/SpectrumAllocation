@@ -92,6 +92,9 @@ def makeDefaultExperimentParam():
 	param.do_plaintext_split = True
 	param.no_pr_thresh_update = False
 
+	param.pt_record_split_power = False
+	param.run_unoptimized_plaintext = False
+
 	param.selection_algo = 'sort'
 	param.secure_write_algo = 'proposed'
 
@@ -152,6 +155,9 @@ class ExperimentParam:
 
 		self.do_plaintext_split = None
 		self.no_pr_thresh_update = None
+
+		self.pt_record_split_power = None
+		self.run_unoptimized_plaintext = None
 
 		self.selection_algo = None
 		self.secure_write_algo = None
@@ -345,6 +351,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 			'splat_dir': 'splat_dir', 'sdf_dir': 'sdf_dir', 'return_dir': 'return_dir',
 			'num_ss_selection': 'nss_s', 'num_pu_selection': 'npu_s',
 			'do_plaintext_split': 'do_pt_split', 'no_pr_thresh_update': 'no_pr_up',
+			'pt_record_split_power': 'rec_sp', 'run_unoptimized_plaintext': 'uo_pt',
 			'selection_algo': 'sel_algo', 'secure_write_algo': 'sec_write_algo',
 			'grid_x': 'grid_x', 'grid_y': 'grid_y',
 			'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
@@ -581,13 +588,14 @@ if __name__ == '__main__':
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5], 'pr_range': [100.0],
-					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_same_height.txt'],
+					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_sh_2.txt'], # sh_1 has a pr_range of 10.0, sh_2 has a pr_range of 100.0
 					# 'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
-					'no_pr_thresh_update': [False],
-					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(True, True)]}
+					'no_pr_thresh_update': [False], 'do_plaintext_split': [True],
+					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(False, False)],
+					'run_unoptimized_plaintext': [False]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
@@ -604,19 +612,6 @@ if __name__ == '__main__':
 			num_bits_test[('s2_pc_bit_count', 'num_float_bits')] = [(32, 8), (48, 12), (64, 16)]
 			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
 			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
-			
-			rp_test[RP_ALPHA] = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0]
-			rp_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(False, False)]
-			rp_test['skip_s2pc'] = [True]
-
-			pl_alpha_test[PL_ALPHA] = [0.1, 0.5, 1.0, 2.0, 4.0, 8.0]
-			pl_alpha_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(False, False), (True, False)]
-			pl_alpha_test['skip_s2pc'] = [True]
-
-			pr_gamma_test['pl_est_gamma'] = [0.1, 0.5, 1.0, 2.0, 4.0, 16.0]
-			pr_gamma_test[('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl')] = [(True, True)]
-			pr_gamma_test['skip_s2pc'] = [True]
-			pr_gamma_test['in_filename'] = ['../gen_out/data_same_height.txt']
 
 			# changes += [pr_gamma_test]
 			changes += [num_ss_s_test] #, num_pu_s_test, num_bits_test] # , secure_write_algo_test]
@@ -662,7 +657,7 @@ if __name__ == '__main__':
 			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [5], 'pr_range': [100.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['../gen_out/data_sh_2.txt']})
+							'out_filename': ['../gen_out/data_sh2.txt']})
 		if experiment == DENSITY_TEST:
 			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
