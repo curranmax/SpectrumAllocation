@@ -491,6 +491,12 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
 			out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
+
+		for(unsigned int i = 0; i < pus[j].prs.size(); ++i) {
+			float path_loss = pm->getPathLoss(pus[j].loc, pus[j].prs[i].loc);
+			out << "PU_PR_PL " << j << " " << i << " " << path_loss << std::endl;
+		}
+
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);
 	}
