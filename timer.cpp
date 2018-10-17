@@ -14,6 +14,9 @@ const std::string Timer::secure_write = "secure_write";
 const std::string Timer::plaintext_split_preprocessing = "plaintext_split_preprocessing";
 const std::string Timer::plaintext_grid_preprocessing = "plaintext_grid_preprocessing";
 
+const std::string Timer::opt_pt_request = "opt_pt_request";
+const std::string Timer::unopt_pt_request = "unopt_pt_request";
+
 void Timer::start(const std::string& tag) {
 	if(current_tag != "") {
 		std::cerr << "Trying to start timer with mismatched tags: (" << tag << ", " << current_tag << ")" << std::endl;

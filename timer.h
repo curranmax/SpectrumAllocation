@@ -26,6 +26,9 @@ public:
 
 	static const std::string plaintext_split_preprocessing;
 	static const std::string plaintext_grid_preprocessing;
+
+	static const std::string opt_pt_request;
+	static const std::string unopt_pt_request;
 private:
 	std::string current_tag;
 	std::chrono::time_point<std::chrono::high_resolution_clock> current_start;

@@ -206,6 +206,7 @@ public:
 	std::vector<float> unoptimizedPlaintextRun(
 			const std::vector<SU>& sus,
 			const std::vector<PU>& input_pus, const std::vector<SS>& sss,
+			Timer* timer,
 			PathLossTable* path_loss_table,
 			std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt,
 			std::vector<std::vector<float> >* su_pu_pl) const;

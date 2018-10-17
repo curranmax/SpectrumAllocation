@@ -1987,6 +1987,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	for(unsigned int i = 0; i < sus.size(); ++i) {
 		P("start PT SU " + std::to_string(i) + " request");
 
+		timer->start(Timer::opt_pt_request);
 		if(sm_params->use_grid) {
 			P("start get from grid PT");
 			sel_pus.clear();
@@ -2020,7 +2021,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 			P("end get from grid PT");
 		}
 		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
-
+		timer->end(Timer::opt_pt_request);
 		// std::cout << "PT Max SU TP: " << v << std::endl;
 		all_vals.push_back(v);
 		
@@ -2031,13 +2032,14 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 	return all_vals;
 }
 
-std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt, std::vector<std::vector<float> >* su_pu_pl) const {
+std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::vector<SU>& sus, const std::vector<PU>& input_pus, const std::vector<SS>& sss, Timer* timer, PathLossTable* path_loss_table, std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt, std::vector<std::vector<float> >* su_pu_pl) const {
 	P("start PlaintextSpectrumManager::unoptimizedPlaintextRun");
 	std::vector<PU> pus = input_pus;
 
 	// Compute the share of received power for each
 	// Indexed by SS first then PU. received_powers[i][j] is the power received at 
 	std::vector<std::vector<float> > received_powers;
+	P("start UO split rp");
 	if(rp_at_ss_from_pu_uo_pt->size() == 0) {
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			std::vector<float> rp_weights;
@@ -2091,6 +2093,7 @@ std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::
 			}
 		}
 	}
+	P("end UO split rp");
 
 	if(su_pu_pl == nullptr) {
 		std::cerr << "No su_pu_pl supplied" << std::endl;
@@ -2104,7 +2107,7 @@ std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::
 	// This is only done since the plaintext algo requires vectors of pointers.
 	std::vector<PU*> sel_pus;
 	std::vector<const SS*> sel_sss;
-	std::vector<std::vector<float> > this_rps;
+	P("start UO build select list");
 	if(!sm_params->use_grid) {
 		for(unsigned int j = 0; j < pus.size(); ++j) {
 			sel_pus.push_back(&pus[j]);
@@ -2114,12 +2117,16 @@ std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::
 			sel_sss.push_back(&sss[i]);
 		}
 	}
+	P("end UO build select list");
 
 	path_loss_table->uo_mode = true;
 
 	std::vector<float> all_vals;
 	for(unsigned int i = 0; i < sus.size(); ++i) {
-		float v = plainTextRadar(sus[i], sel_pus, sel_sss, this_rps, path_loss_table, &((*su_pu_pl)[i]));
+		P("UO SU request " + std::to_string(i));
+		timer->start(Timer::unopt_pt_request);
+		float v = plainTextRadar(sus[i], sel_pus, sel_sss, received_powers, path_loss_table, &((*su_pu_pl)[i]));
+		timer->end(Timer::unopt_pt_request);
 		all_vals.push_back(v);
 	}
 
@@ -2197,6 +2204,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 	unsigned int k_pu = numSelect(sm_params->num_pu_selection, pus.size());
 
 	// SS selection.
+	P("start selection");
 	std::vector<int> sss_inds;
 	std::vector<float> sss_dists;
 	unsigned int k_ss = numSelect(sm_params->num_ss_selection, sss.size());
@@ -2279,9 +2287,11 @@ float PlaintextSpectrumManager::plainTextRadar(
 		std::cerr << "Unsupported selection_algo" << std::endl;
 		exit(1);
 	}
+	P("end selection");
 
 	// Compute weight
 	// w = 1 / d(SU, SS)
+	P("compute SS weight");
 	std::vector<float> weights;
 	float tmp_sum_weight = 0.0;
 	for(unsigned int x = 0; x < sss_inds.size(); ++x) {
@@ -2290,10 +2300,11 @@ float PlaintextSpectrumManager::plainTextRadar(
 			d = 0.0001; 
 		}
 
-		float w = 1.0 / pow(d, sm_params->pl_alpha);
+		float w = pow(1.0 / d, sm_params->pl_alpha_f);
 		weights.push_back(w);
 		tmp_sum_weight += w;
 	}
+	// exit(1);
 
 	bool read_su_pu_pl = (this_su_pu_pl->size() != 0);
 	if(!read_su_pu_pl) {
@@ -2302,6 +2313,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 	
 	// Compute SU transmit power
 	// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
+	P("calc max SU tp");
 	float max_transmit_power = std::numeric_limits<float>::infinity();
 	std::vector<std::vector<float> > estimated_path_loss; // estimated_path_loss[i][j] is the path loss between the su and PU i's PR j.
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
@@ -2354,6 +2366,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 	}
 
 	// Update PR thresholds
+	P("update PR thresholds");
 	if(!(sm_params->no_pr_thresh_update)) {
 		float actual_su_tp = max_transmit_power + su.less_max_tp;
 		bool is_su_transmitting = actual_su_tp > su.min_tp;

@@ -2,6 +2,7 @@
 #ifndef _PATH_LOSS_TABLE_H_
 #define _PATH_LOSS_TABLE_H_
 
+#include <iostream>
 #include <map>
 
 class PLTKey {
@@ -26,15 +27,15 @@ bool operator<(const PLTKey& a, const PLTKey& b);
 class PLTValue {
 public:
 	PLTValue() :
-			sec_set(false), pt_set(false), gt_set(false),
-			sec_pl(0.0), pt_pl(0.0), gt_pl(0.0) {}
+			sec_set(false), pt_set(false), uo_pt_set(false), gt_set(false),
+			sec_pl(0.0), pt_pl(0.0), uo_pt_pl(0.0), gt_pl(0.0) {}
 	~PLTValue() {}
 	PLTValue(const PLTValue& val) :
-			sec_set(val.sec_set), pt_set(val.pt_set), gt_set(val.gt_set),
-			sec_pl(val.sec_pl), pt_pl(val.pt_pl), gt_pl(val.gt_pl) {}
+			sec_set(val.sec_set), pt_set(val.pt_set), uo_pt_set(val.uo_pt_set), gt_set(val.gt_set),
+			sec_pl(val.sec_pl), pt_pl(val.pt_pl), uo_pt_pl(val.uo_pt_pl), gt_pl(val.gt_pl) {}
 	const PLTValue& operator=(const PLTValue& val) {
-		sec_set = val.sec_set; pt_set = val.pt_set; gt_set = val.gt_set;
-		sec_pl = val.sec_pl; pt_pl = val.pt_pl; gt_pl = val.gt_pl;
+		sec_set = val.sec_set; pt_set = val.pt_set; uo_pt_set = val.uo_pt_set; gt_set = val.gt_set;
+		sec_pl = val.sec_pl; pt_pl = val.pt_pl; uo_pt_pl = val.uo_pt_pl; gt_pl = val.gt_pl;
 		return *this;
 	}
 
@@ -92,7 +93,7 @@ public:
 		if(table.count(key) <= 0) {
 			return false;
 		}
-		return table[key].setUnoptimizedPlaintextPathLoss(path_loss);
+		return  table[key].setUnoptimizedPlaintextPathLoss(path_loss);
 	}
 
 	// Only add gt path losses, if there is already an entry in the table from pt.

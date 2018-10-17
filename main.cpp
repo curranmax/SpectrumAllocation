@@ -260,7 +260,7 @@ int main(int argc, char const *argv[]) {
 
 	std::vector<float> uo_plaintext_vs;
 	if(args.run_unoptimized_plaintext) {
-		uo_plaintext_vs = uo_pt_sm.unoptimizedPlaintextRun(sus, pus, sss, &path_loss_table, &rp_at_ss_from_pu_uo_pt, &uo_pt_su_pu_pl);
+		uo_plaintext_vs = uo_pt_sm.unoptimizedPlaintextRun(sus, pus, sss, &t1, &path_loss_table, &rp_at_ss_from_pu_uo_pt, &uo_pt_su_pu_pl);
 	}
 
 	{
@@ -326,7 +326,7 @@ int main(int argc, char const *argv[]) {
 			unsigned int x = 0;
 			for(auto itr = path_loss_table.table.begin(); itr != path_loss_table.table.end(); ++itr) {
 				if(!itr->second.pt_set || !itr->second.gt_set || (args.run_unoptimized_plaintext && !itr->second.uo_pt_set)) {
-					std::cerr << "Path loss not set" << std::endl;
+					std::cerr << std::endl << "Path loss not set: " << !itr->second.pt_set << ", " << !itr->second.gt_set << ", " << args.run_unoptimized_plaintext << ", " << !itr->second.uo_pt_set << std::endl;
 					exit(1);
 				}
 
@@ -367,6 +367,11 @@ int main(int argc, char const *argv[]) {
 			std::cout << "preprocess_time|float|" << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "time_per_request|float|" << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 			std::cout << "secure_write_time|float|" << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
+		}
+
+		std::cout << Timer::opt_pt_request << "|float|" << t1.getAverageDuration(Timer::opt_pt_request) << std::endl;
+		if(args.run_unoptimized_plaintext) {
+			std::cout << Timer::unopt_pt_request << "|float|" << t1.getAverageDuration(Timer::unopt_pt_request) << std::endl;
 		}
 
 		if(!args.use_gt_rp_at_ss_from_pu && args.pt_record_split_power) {
@@ -430,6 +435,9 @@ int main(int argc, char const *argv[]) {
 				std::cout << "Secure:     " << secure_vs[i] << std::endl;
 			}
 			std::cout << "Plain:      " << plaintext_vs[i] << std::endl;
+			if(args.run_unoptimized_plaintext) {
+				std::cout << "UnOpt PT:   " << uo_plaintext_vs[i] << std::endl;
+			}
 			std::cout << "Ground:     " << ground_truth_vs[i] << std::endl;
 			if(!args.skip_s2pc) {
 				std::cout << "Diff PvS:   " << fabs(secure_vs[i] - plaintext_vs[i]) << std::endl;
@@ -446,6 +454,11 @@ int main(int argc, char const *argv[]) {
 			std::cout << "Average duration of " << Timer::secure_preprocessing << ": " << t1.getAverageDuration(Timer::secure_preprocessing) + t1.getAverageDuration(Timer::plaintext_split_preprocessing) + t1.getAverageDuration(Timer::plaintext_grid_preprocessing) << std::endl;
 			std::cout << "Average duration of " << Timer::secure_su_request << ": " << t1.getAverageDuration(Timer::secure_su_request) << std::endl;
 			std::cout << "Average duration of " << Timer::secure_write << ": " << secure_write_timer.getAverageDuration(Timer::secure_write) << std::endl;
+		}
+
+		std::cout << "Average duration of " << Timer::opt_pt_request << ": " << t1.getAverageDuration(Timer::opt_pt_request) << std::endl;
+		if(args.run_unoptimized_plaintext) {
+			std::cout << "Average duration of " << Timer::unopt_pt_request << ": " << t1.getAverageDuration(Timer::unopt_pt_request) << std::endl;
 		}
 	}
 
