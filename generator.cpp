@@ -319,6 +319,8 @@ void Generator::getEntitiesFromFile(
 			}
 
 			su_pu_pls[v] = pl;
+		} else if(token == "PU_PR_PL") {
+
 		} else {
 			std::cerr << "Unexpected token: " << token << std::endl;
 			exit(1);
