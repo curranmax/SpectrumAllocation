@@ -24,12 +24,12 @@
 const float ss_height = 10.0;
 const float su_height = 10.0;
 const float pu_height = 50.0;
+const float pr_height = 50.0;
 
 void Generator::generateEntities(
 		int num_pu, int num_ss, int num_su, int num_pr_per_pu, float pr_range, const std::string & out_filename,
 		std::vector<PU>* pus, std::vector<SS>* sss, std::vector<SU>* sus,
 		std::vector<std::vector<float> >* rp_at_ss_from_pu, std::vector<std::vector<float> >* gt_su_pu_pl) const {
-	const float pr_height = (num_pr_per_pu == 1 ? pu_height : pu_height);
 
 	// SS
 	for(int i = 0; i < num_ss; ++i) {
@@ -493,14 +493,20 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
 			out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
 		}
-
-		for(unsigned int i = 0; i < pus[j].prs.size(); ++i) {
-			float path_loss = pm->getPathLoss(pus[j].loc, pus[j].prs[i].loc);
-			out << "PU_PR_PL " << j << " " << i << " " << path_loss << std::endl;
-		}
-
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);
+
+		// Outputs the PR-PU path loss
+		// pm->preprocessPathLoss(&(pus[j]), pr_height, j);
+		// pm->loadANOFile(pus[j]);
+
+		// for(unsigned int i = 0; i < pus[j].prs.size(); ++i) {
+		// 	float path_loss = pm->getPathLoss(pus[j].loc, pus[j].prs[i].loc);
+		// 	out << "PU_PR_PL " << j << " " << i << " " << path_loss << std::endl;
+		// }
+
+		// // Delete file
+		// utils::deleteFile(pus[j].splat_ano_filename);
 	}
 
 	// PR -> SU

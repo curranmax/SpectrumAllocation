@@ -329,7 +329,7 @@ if __name__ == '__main__':
 				('num_ss_selection', 'nss_s'), ('num_pu_selection', 'npu_s'), ('ss_receive_power_alpha', 'rpa'), ('ss_path_loss_alpha', 'pla'),
 				('num_float_bits', 'nfb'), ('s2_pc_bit_count', 'bc'),
 				('grid_x', 'gx'), ('grid_y', 'gy'),
-				('pl_est_gamma', 'plg')]
+				('pl_est_gamma', 'plg'), ('pr_range', 'prr')]
 	for full_xv, short_xv in x_values:
 		parser.add_argument('-x_' + short_xv, '--use_' + full_xv + '_for_x_value', action = 'store_true', help = 'If given, uses ' + full_xv + ' for the x dimension.')
 
@@ -355,7 +355,8 @@ if __name__ == '__main__':
 	# Group values
 	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'),
 							('secure_write_algo', 'swa'), ('central_entities', 'ces'),
-							('use_gt_rp_at_ss_from_pu', 'use_gt_rp'), ('use_gt_su_pu_pl', 'use_gt_su_pu_pl')]
+							('use_gt_rp_at_ss_from_pu', 'use_gt_rp'), ('use_gt_su_pu_pl', 'use_gt_su_pu_pl'),
+							('propagation_model', 'pm')]
 	for full_gv, short_gv in g_values:
 		parser.add_argument('-g_' + short_gv, '--use_' + full_gv + '_for_group_value', action = 'store_true', help = 'If given, uses ' + full_gv + ' for grouping data.')
 

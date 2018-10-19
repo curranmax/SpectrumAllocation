@@ -540,6 +540,9 @@ if __name__ == '__main__':
 
 	parser.add_argument('-nr', '--no_run', action = 'store_true', help = 'If given, doesn\'t run the tests, simply outputs the commands')
 
+	parser.add_argument('-prr', '--pr_range', metavar = 'PR_RANGE', type = float, nargs = 1, default = [100.0], help = 'For the output test, is the range to generate PRs at.')
+	
+
 	args = parser.parse_args()
 	experiments = args.experiment_identifier
 
@@ -583,12 +586,13 @@ if __name__ == '__main__':
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
 		if experiment in [INTERPOLATION, GRID_AND_SELECTION, FLOATING_VS_FIXED, TIME]:
+			pr_ranges = [10, 50, 100]
+
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
-					'num_pr_per_pu' : [5], 'pr_range': [100.0],
-					'propagation_model': ['input_file', 'log_distance'],
-					'in_filename' : ['../gen_out/data_sh_100m.txt'],
-					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+					'num_pr_per_pu' : [5],
+					('propagation_model', 'in_filename', 'pr_range'): [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] + [('log_distance', None, pr_range) for pr_range in pr_ranges],
+					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [2.0],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
 					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': ['two_sms'],
@@ -600,13 +604,14 @@ if __name__ == '__main__':
 				int_ss = deepcopy(default_values)
 				int_pu = deepcopy(default_values)
 
-				int_ss['num_ss'] = [100, 500, 1000, 2000, 3000, 4000]
-				int_pu['num_pu'] = [10, 50, 100, 200, 300, 400]
+				# int_ss['num_ss'] = [100, 500, 1000, 2000, 3000, 4000]
+				# int_pu['num_pu'] = [10, 50, 100, 200, 300, 400]
+				int_ss[RP_ALPHA] = [1.0 , 2.0, 3.0, 4.0, 6.0, 8.0]
 
 				int_ss[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
 				int_pu[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
 
-				changes += [int_ss, int_pu]
+				changes += [int_ss] # , int_pu]
 
 			if experiment == GRID_AND_SELECTION:
 				gs_gs = deepcopy(default_values)
@@ -719,7 +724,8 @@ if __name__ == '__main__':
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
 		if experiment == OUTPUT_RUN:
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [5], 'pr_range': [50.0],
+			pr_range = args.pr_range[0]
+			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [5], 'pr_range': [pr_range],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/data_sh_50m.txt']})
