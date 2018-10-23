@@ -8,10 +8,17 @@
 #include <map>
 #include <vector>
 
-void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, const std::map<int, std::vector<const PUint*> >& pu_groups, unsigned int num_pu,
+void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, const std::map<int, std::vector<const PUint*> >& pu_groups, unsigned int num_pu, int grid_size,
 					GridTable* grid_table, PUTable* pu_table) {
 	
 	pu_table->num_pr_per_pu = -1;
+
+	int ss_per_entry = -1;
+	int pu_per_entry = -1;
+
+	bool tmp_ss_set = false, tmp_pu_set = false;
+	SSint tmp_ss;
+	int tmp_pu_ind;
 
 	for(auto ss_itr = ss_groups.begin(); ss_itr != ss_groups.end(); ++ss_itr) {
 		auto pu_itr = pu_groups.find(ss_itr->first);
@@ -21,8 +28,17 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 			exit(1);
 		}
 
+		if(ss_per_entry == -1) {
+			ss_per_entry = int(ss_itr->second.size());
+		}
+
 		for(unsigned int i = 0; i < ss_itr->second.size(); ++i) {
 			SSint ss_copy(*(ss_itr->second[i]));
+
+			if(!tmp_ss_set) {
+				tmp_ss = ss_copy;
+				tmp_ss_set = true;
+			}
 
 			std::vector<int> new_rp;
 			for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
@@ -34,12 +50,22 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 			grid_table->sss[ss_itr->first].push_back(ss_copy);
 		}
 
+
+		if(pu_per_entry == -1) {
+			pu_per_entry = int(pu_itr->second.size());
+		}
+
 		for(unsigned int j = 0; j < pu_itr->second.size(); ++j) {
 			if(pu_table->num_pr_per_pu == -1) {
 				pu_table->num_pr_per_pu = pu_itr->second[j]->prs.size();
 			} else if(pu_table->num_pr_per_pu != int(pu_itr->second[j]->prs.size())) {
 				std::cerr << "Inconsistent number of PUs" << std::endl;
 				exit(1);
+			}
+
+			if(!tmp_pu_set) {
+				tmp_pu_ind = pu_itr->second[j]->index;
+				tmp_pu_set = true;
 			}
 
 			grid_table->pu_refs[pu_itr->first].push_back(pu_itr->second[j]->index);
@@ -59,6 +85,20 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 				tmp.prs.push_back(PRint());
 			}
 			pu_table->pus[i] = tmp;
+		}
+	}
+
+	if(grid_size > 0) {
+		for(int i = 0; i < grid_size; ++i) {
+			auto ss_itr = grid_table->sss.find(i);
+			if(ss_itr == grid_table->sss.end()) {
+				grid_table->sss[i] = std::vector<SSint>(ss_per_entry, tmp_ss);
+			}
+
+			auto pu_itr = grid_table->pu_refs.find(i);
+			if(pu_itr == grid_table->pu_refs.end()) {
+				grid_table->pu_refs[i] = std::vector<int>(pu_per_entry, tmp_pu_ind);
+			}
 		}
 	}
 
