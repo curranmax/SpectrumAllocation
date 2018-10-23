@@ -8,7 +8,7 @@
 #include <map>
 #include <vector>
 
-void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, const std::map<int, std::vector<const PUint*> >& pu_groups, unsigned int num_pu, int grid_size,
+void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, const std::map<int, std::vector<const PUint*> >& pu_groups, const std::vector<PUint>& pus, int grid_size,
 					GridTable* grid_table, PUTable* pu_table) {
 	
 	pu_table->num_pr_per_pu = -1;
@@ -77,14 +77,10 @@ void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups, con
 	}
 
 
-	for(unsigned int i = 0; i < num_pu; ++i) {
+	for(unsigned int i = 0; i < pus.size(); ++i) {
 		auto pu_itr = pu_table->pus.find(i);
 		if(pu_itr == pu_table->pus.end()) {
-			PUint tmp;
-			for(int j = 0; j < pu_table->num_pr_per_pu; ++j) {
-				tmp.prs.push_back(PRint());
-			}
-			pu_table->pus[i] = tmp;
+			pu_table->pus[i] = pus[i];
 		}
 	}
 

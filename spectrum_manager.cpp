@@ -162,7 +162,7 @@ std::vector<float> SpectrumManager::run(
 			pu_groups = securePUGridPreprocess(parties);
 		}
 
-		buildTables(ss_groups, pu_groups, all_pus.size(), -1, &grid_table, &pu_table);
+		buildTables(ss_groups, pu_groups, all_pus, -1, &grid_table, &pu_table);
 	}
 
 	timer->end(Timer::secure_preprocessing);
@@ -304,8 +304,8 @@ std::vector<float> SpectrumManager::runSM(
 			exit(1);
 		}
 
-		buildTables(ss_groups, pu_groups, all_pus.size(), -1, &grid_table, &pu_table);
-		buildTables(en_ss_groups, en_pu_groups, en_pus.size(), sm_params->grid_num_x * sm_params->grid_num_y, &en_grid_table, &en_pu_table);
+		buildTables(ss_groups, pu_groups, all_pus, -1, &grid_table, &pu_table);
+		buildTables(en_ss_groups, en_pu_groups, en_pus, sm_params->grid_num_x * sm_params->grid_num_y, &en_grid_table, &en_pu_table);
 	}
 
 	if(parties[0].isLocalParty() && !(sm_params->brief_out)) {
