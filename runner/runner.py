@@ -592,7 +592,7 @@ if __name__ == '__main__':
 				grid_size = 100
 
 			if exp in [FULL_TEST_TWO_SMS, SMALL_GRID_TWO_SMS]:
-				pm = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] +
+				pm = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] + \
 							[('log_distance', None, pr_range) for pr_range in pr_ranges]
 			elif exp in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				pm = [('log_distance', None, pr_range) for pr_range in pr_ranges]
