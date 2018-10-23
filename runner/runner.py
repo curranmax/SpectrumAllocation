@@ -17,11 +17,6 @@ ALPHA_TEST = 'alpha_test'
 
 VARY_NUM_SS_SELECT = 'vary_ss_select'
 
-INTERPOLATION = 'interpolation'
-GRID_AND_SELECTION = 'grid_and_selection'
-FLOATING_VS_FIXED = 'floating_vs_fixed'
-TIME = 'time'
-
 FULL_TEST_TWO_SMS = 'full_test-two_sms'
 FULL_TEST_SM_KS = 'full_test-sm_ks'
 SMALL_GRID_TWO_SMS = 'small_grid-two_sms'
@@ -41,7 +36,6 @@ DENSITY_TEST = 'density'
 
 ALL_EXPERIMENT_IDS = [TEST, ALPHA_TEST,
 						VARY_NUM_SS_SELECT,
-						INTERPOLATION, GRID_AND_SELECTION, FLOATING_VS_FIXED, TIME,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS,
 						PATH_LOSS_TEST, KS_TIMING, MED_TEST, LARGE_TEST,
@@ -585,68 +579,10 @@ if __name__ == '__main__':
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
-		if experiment in [INTERPOLATION, GRID_AND_SELECTION, FLOATING_VS_FIXED, TIME]:
-			pr_ranges = [10, 50, 100]
-
-			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
-					('grid_x', 'grid_y'): [(1000, 1000)], 'selection_algo': ['none'],
-					'num_pr_per_pu' : [5],
-					('propagation_model', 'in_filename', 'pr_range'): [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] + [('log_distance', None, pr_range) for pr_range in pr_ranges],
-					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [2.0],
-					'num_pu': [400], 'num_ss': [4000], 'num_su': [100],
-					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
-					'central_entities': ['two_sms'],
-					'no_pr_thresh_update': [False], 'do_plaintext_split': [True],
-					('skip_s2pc', 'run_unoptimized_plaintext'): [(False, False)]}
-
-			# INTERPOLATION
-			if experiment == INTERPOLATION:
-				int_ss = deepcopy(default_values)
-				int_pu = deepcopy(default_values)
-
-				# int_ss['num_ss'] = [100, 500, 1000, 2000, 3000, 4000]
-				# int_pu['num_pu'] = [10, 50, 100, 200, 300, 400]
-				int_ss[RP_ALPHA] = [1.0 , 2.0, 3.0, 4.0, 6.0, 8.0]
-
-				int_ss[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
-				int_pu[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
-
-				changes += [int_ss] # , int_pu]
-
-			if experiment == GRID_AND_SELECTION:
-				gs_gs = deepcopy(default_values)
-				gs_ss = deepcopy(default_values)
-				gs_pu = deepcopy(default_values)
-
-				gs_gs[('grid_x', 'grid_y')] = [(v, v) for v in [10, 100, 500, 1000]]
-				gs_ss[NUM_SS_SELECTION] = [1, 10, 25, 50]
-				gs_pu['num_pu_selection'] = [1, 10, 25, 50]
-
-				gs_gs[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
-				gs_ss[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
-				gs_pu[('skip_s2pc', 'run_unoptimized_plaintext')] = [(True, True)]
-
-				changes += [gs_gs, gs_ss, gs_pu]
-
-			if experiment == FLOATING_VS_FIXED:
-				ff = deepcopy(default_values)
-
-				ff[('s2_pc_bit_count', 'num_float_bits')] = [(64, 16), (48, 12), (32, 8)]
-
-				changes += [ff]
-
-			if experiment == TIME:
-				t_gs = deepcopy(default_values)
-				t_ss = deepcopy(default_values)
-				t_pu = deepcopy(default_values)
-
-				t_gs[('grid_x', 'grid_y')] = [(v, v) for v in [10, 100, 500, 1000]]
-				t_ss[NUM_SS_SELECTION] = [1, 10, 25, 50]
-				t_pu['num_pu_selection'] = [1, 10, 25, 50]
-
-				changes += [t_gs, t_ss, t_pu]
 
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS, SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
+			pr_ranges = [100]
+
 			num_su = 100
 			if experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				num_su = 2
@@ -657,34 +593,24 @@ if __name__ == '__main__':
 
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
-					'num_pr_per_pu' : [5], 'pr_range': [100.0],
-					'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_sh_100m.txt'], # sh_1 has a pr_range of 10.0, sh_2 has a pr_range of 100.0
-					# 'propagation_model': ['log_distance'], 'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [0.5],
+					'num_pr_per_pu' : [5],
+					('propagation_model', 'in_filename', 'pr_range'):
+							[('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] +
+							[('log_distance', None, pr_range) for pr_range in pr_ranges],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
 					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
-					'no_pr_thresh_update': [False], 'do_plaintext_split': [True],
-					('use_gt_rp_at_ss_from_pu', 'use_gt_su_pu_pl'): [(False, False)],
-					('skip_s2pc', 'run_unoptimized_plaintext'): [(True, True)]}
+					'no_pr_thresh_update': [False], 'do_plaintext_split': [True]}
 
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
-			num_bits_test = deepcopy(default_values)
-			# secure_read_algo_test
-			secure_write_algo_test = deepcopy(default_values)
+			gs_test = deepcopy(default_values)
 
-			rp_test = deepcopy(default_values)
-			pl_alpha_test = deepcopy(default_values)
-			pr_gamma_test = deepcopy(default_values)
-
-			num_ss_s_test[NUM_SS_SELECTION] = [1, 10, 25, 50]
+			num_ss_s_test['num_ss_selection'] = [1, 10, 25, 50]
 			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
-			num_bits_test[('s2_pc_bit_count', 'num_float_bits')] = [(32, 8), (48, 12), (64, 16)]
-			secure_write_algo_test['secure_write_algo'] = ['proposed', 'spc']
-			secure_write_algo_test['num_pu_selection'] = [1, 10, 25, 50]
-
-			# changes += [pr_gamma_test]
-			changes += [num_ss_s_test, num_pu_s_test] #, num_bits_test] # , secure_write_algo_test]
+			gs_test[('grid_x', 'grid_y')] = [(v, v) for v in [10, 50, 100, 500, 1000]]
+			
+			changes += [num_ss_s_test, num_pu_s_test, gs_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],

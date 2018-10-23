@@ -28,6 +28,7 @@ public:
 
 void buildTables(const std::map<int, std::vector<const SSint*> >& ss_groups,
 					const std::map<int, std::vector<const PUint*> >& pu_groups,
+					unsigned int num_pu,
 					GridTable* grid_table,
 					PUTable* pu_table);
 

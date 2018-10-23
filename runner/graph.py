@@ -295,7 +295,8 @@ y_labels = {'percent_diff_secure_vs_plain': 'Percent Difference between Secure a
 			'db_diff_secure_vs_ground': 'dB Difference between Secure and Ground',
 			'time_per_request': 'Time per SU Request (seconds)',
 			'preprocess_time': 'Pre-process time (seconds)',
-			'secure_write_time': 'Secure Write Time (seconds)'}
+			'secure_write_time': 'Secure Write Time (seconds)',
+			'su_pr_path_loss_error': 'Interpolation between Plaintext and Ground Truth (dB)'}
 
 def getYLabel(yv):
 	if yv in y_labels:
@@ -338,6 +339,7 @@ if __name__ == '__main__':
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
 				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
 				('db_diff_plain_vs_unopt', 'pvu_db'), ('db_diff_unopt_vs_ground', 'uvg_db'),
+				('su_pr_path_loss_error', 'pr_ple'),
 				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
 				('recvEncryptedData_recv', 'red_r'), ('recvEncryptedData_decrypt', 'red_d'), ('sendEncryptedPRThresholds', 'sepr'),
 				('rp_split_dif', 'rsd')]
@@ -410,7 +412,8 @@ if __name__ == '__main__':
 						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_plain_vs_unopt': (('su_transmit_power', 'plain'), ('su_transmit_power', 'uo'), 'unit_type'),
 						'db_diff_unopt_vs_ground': (('su_transmit_power', 'uo'), ('su_transmit_power', 'ground'), 'unit_type'),
-						'rp_split_dif': ('rp_at_ss_from_pu', 'rp_at_ss_from_pu_pt', 'unit_type')}
+						'rp_split_dif': ('rp_at_ss_from_pu', 'rp_at_ss_from_pu_pt', 'unit_type'),
+						'su_pr_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type')}
 	complex_y_funcs = {'percent_diff_secure_vs_plain': percentDifference,
 						'percent_diff_plain_vs_ground': percentDifference,
 						'percent_diff_secure_vs_ground': percentDifference,
@@ -419,7 +422,8 @@ if __name__ == '__main__':
 						'db_diff_secure_vs_ground': dbDifference,
 						'db_diff_plain_vs_unopt': dbDifference,
 						'db_diff_unopt_vs_ground': dbDifference,
-						'rp_split_dif': dbDifference}
+						'rp_split_dif': dbDifference,
+						'su_pr_path_loss_error': pathLossError}
 	this_y_value = None
 	for full_yv, _ in y_values:
 		if getattr(args, 'use_' + full_yv + '_for_y_value'):

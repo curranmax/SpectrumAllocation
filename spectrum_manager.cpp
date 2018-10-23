@@ -162,7 +162,7 @@ std::vector<float> SpectrumManager::run(
 			pu_groups = securePUGridPreprocess(parties);
 		}
 
-		buildTables(ss_groups, pu_groups, &grid_table, &pu_table);
+		buildTables(ss_groups, pu_groups, all_pus.size(), &grid_table, &pu_table);
 	}
 
 	timer->end(Timer::secure_preprocessing);
@@ -304,8 +304,8 @@ std::vector<float> SpectrumManager::runSM(
 			exit(1);
 		}
 
-		buildTables(ss_groups, pu_groups, &grid_table, &pu_table);
-		buildTables(en_ss_groups, en_pu_groups, &en_grid_table, &en_pu_table);
+		buildTables(ss_groups, pu_groups, all_pus.size(), &grid_table, &pu_table);
+		buildTables(en_ss_groups, en_pu_groups, en_pus.size(), &en_grid_table, &en_pu_table);
 	}
 
 	if(parties[0].isLocalParty() && !(sm_params->brief_out)) {
@@ -1456,6 +1456,8 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 			}
 		}
 	
+		PWID("A");
+
 		// Generate the two initial tables
 		std::vector<std::vector<int> > update_table_1(num_pu, std::vector<int>(num_pr_per_pu));
 		std::vector<std::vector<int> > update_table_2(num_pu, std::vector<int>(num_pr_per_pu));
@@ -1472,6 +1474,8 @@ void SpectrumManager::secureTableWrite(std::array<Party, 2> parties, PUTable* pu
 				update_table_2[this_updates[i].first][j] = this_updates[i].second[j] - update_table_1[this_updates[i].first][j];
 			}
 		}
+
+		PWID("B");
 	
 		// Shift one table by shift
 		shiftTable(update_table_2, shift);
@@ -1887,7 +1891,7 @@ std::vector<float> PlaintextSpectrumManager::plainTextRun(const std::vector<SU>&
 		std::map<int, std::vector<int> > ss_int_groups;
 		
 		P("start PT grid calc");
-		plainTextGrid(pus, sss, &pu_int_groups, &ss_int_groups);
+		plainTextGrid(sus, pus, sss, &pu_int_groups, &ss_int_groups);
 		P("end PT grid calc");
 
 		P("start creating PU group");
@@ -2136,8 +2140,23 @@ std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::
 	return all_vals;
 }
 
-void PlaintextSpectrumManager::plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,
+void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const std::vector<PU>& pus, const std::vector<SS>& sss,
 		std::map<int, std::vector<int> >* pu_int_groups, std::map<int, std::vector<int> >* ss_int_groups) const {
+	std::set<std::pair<int, int> > grid_locs_to_compute;
+	if(sus.size() > 0) {
+		for(unsigned int i = 0; i < sus.size(); ++i) {
+			int x = int(sus[i].loc.x / sm_params->grid_delta_x);
+			int y = int(sus[i].loc.y / sm_params->grid_delta_y);
+			grid_locs_to_compute.insert(std::make_pair(x, y));
+		}
+	} else {
+		for(int x = 0; x < sm_params->grid_num_x; ++x) {
+			for(int y = 0; y < sm_params->grid_num_y; ++y) {
+				grid_locs_to_compute.insert(std::make_pair(x, y));
+			}
+		}
+	}
+
 	struct comp {
 		bool operator()(const std::pair<float, int>& v1, const std::pair<float, int>& v2) const {
 			return v1.first < v2.first;
@@ -2145,54 +2164,52 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<PU>& pus, const s
 	};
 
 	// PU Groups
-	for(int x = 0; x < sm_params->grid_num_x; ++x) {
-		for(int y = 0; y < sm_params->grid_num_y; ++y) {
-			std::vector<std::pair<float, int> > pu_vals;
+	for(auto itr = grid_locs_to_compute.begin(); itr != grid_locs_to_compute.end(); ++itr) {
+		int x = itr->first, y = itr->second;
+		std::vector<std::pair<float, int> > pu_vals;
 
-			for(unsigned int i = 0; i < pus.size(); ++i) {
-				float this_dist = pus[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
+		for(unsigned int i = 0; i < pus.size(); ++i) {
+			float this_dist = pus[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
 
-				if((int) pu_vals.size() < sm_params->grid_min_num_pu || this_dist < pu_vals.front().first) {
-					if((int) pu_vals.size() >= sm_params->grid_min_num_pu) {
-						std::pop_heap(pu_vals.begin(), pu_vals.end(), comp());
-						pu_vals.pop_back();
-					}
-
-					pu_vals.push_back(std::make_pair(this_dist, i));
-					std::push_heap(pu_vals.begin(), pu_vals.end(), comp());
+			if((int) pu_vals.size() < sm_params->grid_min_num_pu || this_dist < pu_vals.front().first) {
+				if((int) pu_vals.size() >= sm_params->grid_min_num_pu) {
+					std::pop_heap(pu_vals.begin(), pu_vals.end(), comp());
+					pu_vals.pop_back();
 				}
-			}
 
-			int group_id = x + y * sm_params->grid_num_x;
-			for(unsigned int i = 0; i < pu_vals.size(); ++i) {
-				(*pu_int_groups)[group_id].push_back(pu_vals[i].second);
+				pu_vals.push_back(std::make_pair(this_dist, i));
+				std::push_heap(pu_vals.begin(), pu_vals.end(), comp());
 			}
+		}
+
+		int group_id = x + y * sm_params->grid_num_x;
+		for(unsigned int i = 0; i < pu_vals.size(); ++i) {
+			(*pu_int_groups)[group_id].push_back(pu_vals[i].second);
 		}
 	}
 
 	// SS Groups
-	for(int x = 0; x < sm_params->grid_num_x; ++x) {
-		for(int y = 0; y < sm_params->grid_num_y; ++y) {
-			std::vector<std::pair<float, int>> ss_vals;
+	for(auto itr = grid_locs_to_compute.begin(); itr != grid_locs_to_compute.end(); ++itr) {
+		int x = itr->first, y = itr->second;
+		std::vector<std::pair<float, int>> ss_vals;
 
-			for(unsigned int i = 0; i < sss.size(); ++i) {
-				float this_dist = sss[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
+		for(unsigned int i = 0; i < sss.size(); ++i) {
+			float this_dist = sss[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
 
-				if((int) ss_vals.size() < sm_params->grid_min_num_ss || this_dist < ss_vals.front().first) {
-					if((int) ss_vals.size() >= sm_params->grid_min_num_ss) {
-						std::pop_heap(ss_vals.begin(), ss_vals.end(), comp());
-						ss_vals.pop_back();
-					}
-
-					ss_vals.push_back(std::make_pair(this_dist, i));
-					std::push_heap(ss_vals.begin(), ss_vals.end(), comp());
+			if((int) ss_vals.size() < sm_params->grid_min_num_ss || this_dist < ss_vals.front().first) {
+				if((int) ss_vals.size() >= sm_params->grid_min_num_ss) {
+					std::pop_heap(ss_vals.begin(), ss_vals.end(), comp());
+					ss_vals.pop_back();
 				}
-			}
 
-			int group_id = x + y * sm_params->grid_num_x;
-			for(unsigned int i = 0; i < ss_vals.size(); ++i) {
-				(*ss_int_groups)[group_id].push_back(ss_vals[i].second);
+				ss_vals.push_back(std::make_pair(this_dist, i));
+				std::push_heap(ss_vals.begin(), ss_vals.end(), comp());
 			}
+		}
+
+		int group_id = x + y * sm_params->grid_num_x;
+		for(unsigned int i = 0; i < ss_vals.size(); ++i) {
+			(*ss_int_groups)[group_id].push_back(ss_vals[i].second);
 		}
 	}
 }

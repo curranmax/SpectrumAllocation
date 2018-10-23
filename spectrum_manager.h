@@ -211,7 +211,7 @@ public:
 			std::vector<std::vector<float> >* rp_at_ss_from_pu_uo_pt,
 			std::vector<std::vector<float> >* su_pu_pl) const;
 
-	void plainTextGrid(const std::vector<PU>& pus, const std::vector<SS>& sss,
+	void plainTextGrid(const std::vector<SU>& sus, const std::vector<PU>& pus, const std::vector<SS>& sss,
 			std::map<int, std::vector<int> >* pu_int_groups, std::map<int, std::vector<int> >* ss_int_groups) const;
 
 	float plainTextRadar(const SU& su,

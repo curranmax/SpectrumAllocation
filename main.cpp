@@ -177,7 +177,7 @@ int main(int argc, char const *argv[]) {
 		std::map<int, std::vector<int> > precomputed_ss_int_groups;
 		if(sm_params.use_grid) {
 			t1.start(Timer::plaintext_grid_preprocessing);
-			pt_sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
+			pt_sm.plainTextGrid(sus, pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
 			t1.end(Timer::plaintext_grid_preprocessing);
 		}
 
@@ -283,7 +283,7 @@ int main(int argc, char const *argv[]) {
 	if(args.brief_out) {
 		std::stringstream names, types;
 		if(!args.skip_s2pc) {
-			names << "secue,";
+			names << "secure,";
 			types << "float,";
 		}
 
@@ -377,7 +377,7 @@ int main(int argc, char const *argv[]) {
 		if(!args.use_gt_rp_at_ss_from_pu && args.pt_record_split_power) {
 			std::map<int, std::vector<int> > precomputed_pu_int_groups;
 			std::map<int, std::vector<int> > precomputed_ss_int_groups;
-			pt_sm.plainTextGrid(pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
+			pt_sm.plainTextGrid(std::vector<SU>(), pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
 			
 			std::set<std::pair<int, int> > relevant_ss_pu;
 
