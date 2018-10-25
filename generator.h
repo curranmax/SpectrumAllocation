@@ -29,7 +29,7 @@ public:
 class Generator {
 public:
 	Generator() = delete;
-	Generator(float location_range_, PropagationModel* pm_) : location_range(location_range_), pm(pm_), pr_pls() {}
+	Generator(float _location_range, float _su_buffer, PropagationModel* pm_) : location_range(_location_range), su_buffer(_su_buffer), pm(pm_), pr_pls() {}
 	Generator(const Generator& gen) = delete;
 
 	~Generator() {
@@ -49,7 +49,7 @@ public:
 	std::vector<float> computeGroundTruth(const std::vector<SU>& su, const std::vector<PU>& input_pus, PathLossTable* path_loss_table, bool no_pr_thresh_update) const;
 
 private:
-	float location_range;
+	float location_range, su_buffer;
 
 	PropagationModel* pm;
 

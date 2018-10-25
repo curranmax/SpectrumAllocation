@@ -45,6 +45,7 @@ Args::Args(const int &argc, char const *argv[]) {
 			Arg_Val(&num_ss, 1, "-nss", "NUM_SS", "Number of Spectrum Sensors to generate."),
 			Arg_Val(&num_su, 1, "-nsu", "NUM_SU", "Number of Secondary Users to generate."),
 			Arg_Val(&location_range, 100.0, "-lr", "LOC_RANGE", "Range of locations entities will be placed"),
+			Arg_Val(&su_buffer, 0.0, "-su_buff", "SU_BUFFER", "Buffer around the edge of the error which no SUs will be placed."),
 			Arg_Val(&num_pr_per_pu, 1, "-npr", "NUM_PR_PER_PU", "Number of PRs to generate per PU."),
 			Arg_Val(&pr_range, 0.0, "-prr", "PR_RANGE", "Range to place PRs around PUs."),
 			Arg_Val(&unit_type, "abs", "-ut", "UNIT_TYPE", "Unit type to use for calculations. Must be either \"abs\" or \"db\""),

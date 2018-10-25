@@ -51,6 +51,7 @@ class Args {
 	int num_ss;
 	int num_su;
 	float location_range; // in Meters
+	float su_buffer; // in Meters
 
 	int num_pr_per_pu;
 	float pr_range;

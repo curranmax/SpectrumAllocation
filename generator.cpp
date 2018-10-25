@@ -143,7 +143,6 @@ void Generator::generateEntities(
 	}
 
 	// SU
-	float su_buffer = 0.0;
 	for(int i = 0; i < num_su; ++i) {
 		if(out_filename != "") {
 			std::cout << "Generating SU " << i + 1 << " of " << num_su << std::endl;
@@ -389,6 +388,15 @@ void Generator::getEntitiesFromFile(
 	}
 
 	// SU
+	// Filter out SUs that are too close to the edge
+	std::vector<SU> new_all_sus;
+	for(unsigned int i = 0; i < all_sus.size(); ++i) {
+		if(all_sus[i].loc.x >= su_buffer && all_sus[i].loc.x < location_range - su_buffer && all_sus[i].loc.y >= su_buffer && all_sus[i].loc.y < location_range - su_buffer) {
+			new_all_sus.push_back(all_sus[i]);
+		}
+	}
+	all_sus = new_all_sus;
+
 	if(int(all_sus.size()) > num_su) {
 		std::shuffle(all_sus.begin(), all_sus.end(), std::default_random_engine(time(nullptr)));
 		for(int i = 0; i < num_su; ++i) {

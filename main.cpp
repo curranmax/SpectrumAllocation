@@ -1,5 +1,6 @@
 
 #include "args.h"
+#include "debug_print.h"
 #include "generator.h"
 #include "key_server.h"
 #include "location.h"
@@ -62,7 +63,7 @@ int main(int argc, char const *argv[]) {
 	}
 
 	// Generate enetities
-	Generator gen(args.location_range, pm);
+	Generator gen(args.location_range, args.su_buffer, pm);
 
 	std::vector<PU> pus;
 	std::vector<SS> sss;
@@ -377,10 +378,14 @@ int main(int argc, char const *argv[]) {
 		if(!args.use_gt_rp_at_ss_from_pu && args.pt_record_split_power) {
 			std::map<int, std::vector<int> > precomputed_pu_int_groups;
 			std::map<int, std::vector<int> > precomputed_ss_int_groups;
-			pt_sm.plainTextGrid(std::vector<SU>(), pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
-			
-			std::set<std::pair<int, int> > relevant_ss_pu;
 
+			P("start grid comp for rp reporting");
+			pt_sm.plainTextGrid(sus, pus, sss, &precomputed_pu_int_groups, &precomputed_ss_int_groups);
+			P("end grid comp for rp reporting");
+			
+
+			P("start revelant SS-PU pairs");
+			std::set<std::pair<int, int> > relevant_ss_pu;
 			for(auto pu_itr = precomputed_pu_int_groups.begin(); pu_itr != precomputed_pu_int_groups.end(); ++pu_itr) {
 				auto ss_itr = precomputed_ss_int_groups.find(pu_itr->first);
 				if(ss_itr == precomputed_ss_int_groups.end()) {
@@ -394,6 +399,7 @@ int main(int argc, char const *argv[]) {
 					}
 				}
 			}
+			P("end revelant SS-PU pairs");
 
 			std::cout << "rp_at_ss_from_pu|list(float)|";
 			unsigned int x = 0;
@@ -417,16 +423,18 @@ int main(int argc, char const *argv[]) {
 			}
 			std::cout << std::endl;
 
-			std::cout << "rp_at_ss_from_pu_uo_pt|list(float)|";
-			x = 0;
-			for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
-				std::cout << rp_at_ss_from_pu_uo_pt[itr->first][itr->second];
-				if(x < relevant_ss_pu.size() - 1) {
-					std::cout << ",";
+			if(args.run_unoptimized_plaintext) {
+				std::cout << "rp_at_ss_from_pu_uo_pt|list(float)|";
+				x = 0;
+				for(auto itr = relevant_ss_pu.begin(); itr != relevant_ss_pu.end(); ++itr) {
+					std::cout << rp_at_ss_from_pu_uo_pt[itr->first][itr->second];
+					if(x < relevant_ss_pu.size() - 1) {
+						std::cout << ",";
+					}
+					++x;
 				}
-				++x;
+				std::cout << std::endl;
 			}
-			std::cout << std::endl;
 		}
 	} else {
 		for(unsigned int i = 0; i < plaintext_vs.size(); ++i) {
