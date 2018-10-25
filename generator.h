@@ -106,19 +106,17 @@ private:
 
 class AnoData {
 public:
-	AnoData() : ind(-1), loc(), pl() {}
+	AnoData() : loc(), pl() {}
 	~AnoData() {}
 
-	AnoData(int _ind, const Location& _loc, float _pl) : ind(_ind), loc(_loc), pl(_pl) {}
-	AnoData(const AnoData& ano_data) : ind(ano_data.ind), loc(ano_data.loc), pl(ano_data.pl) {}
+	AnoData(const Location& _loc, float _pl) : loc(_loc), pl(_pl) {}
+	AnoData(const AnoData& ano_data) : loc(ano_data.loc), pl(ano_data.pl) {}
 	const AnoData& operator=(const AnoData& ano_data) {
-		ind = ano_data.ind;
 		loc = ano_data.loc;
 		pl  = ano_data.pl;
 		return *this;
 	}
 
-	int ind;
 	Location loc;
 	float pl;
 };
@@ -132,22 +130,13 @@ struct sort_by_x {
 	}
 };
 
-struct sort_by_y {
-	bool operator()(const AnoData& v1, const AnoData& v2) const {
-		if(v1.loc.y == v2.loc.y) {
-			return v1.loc.x < v2.loc.x;
-		}
-		return v1.loc.y < v2.loc.y;
-	}
-};
-
 class TransmitterOnlySplatPM :public PropagationModel {
 public:
 	TransmitterOnlySplatPM() = delete;
 	TransmitterOnlySplatPM(const std::string _splat_cmd, float _ref_lat, float _ref_long,
 					const std::string _splat_dir, const std::string _sdf_dir, const std::string _return_dir)
 			: PropagationModel(), splat_cmd(_splat_cmd), ref_lat(_ref_lat), ref_long(_ref_long), splat_dir(_splat_dir), sdf_dir(_sdf_dir), return_dir(_return_dir),
-			k(10), alpha(4.0), gamma(0.25), cur_loc(0, 0), cur_ano_data_by_x(), cur_ano_data_by_y()
+			k(5), alpha(4.0), gamma(0.25), cur_loc(0, 0), cur_ano_data_by_x()
 	{
 		if(splat_cmd != "splat") {
 			std::cerr << "LR command must be 'splat', got: " << splat_cmd << std::endl;
@@ -177,7 +166,6 @@ private:
 
 	Location cur_loc;
 	std::set<AnoData, sort_by_x> cur_ano_data_by_x;
-	std::set<AnoData, sort_by_y> cur_ano_data_by_y;
 };
 
 #endif

@@ -502,13 +502,13 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		pm->loadANOFile(pus[j]);
 		for(unsigned int i = 0; i < sss.size(); ++i) {
 			float path_loss = pm->getPathLoss(pus[j].loc, sss[i].loc);
-			out << "PU_PL " << j << " " << i << " " << path_loss << std::endl;
+			out << "A " << j << " " << i << " " << path_loss << std::endl;
 		}
 
-		for(unsigned int i = 0; i < sus.size(); ++i) {
-			float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
-			out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
-		}
+		// for(unsigned int i = 0; i < sus.size(); ++i) {
+		// 	float path_loss = pm->getPathLoss(pus[j].loc, sus[i].loc);
+		// 	out << "SU_PU_PL " << j << " " << i << " " << path_loss << std::endl;
+		// }
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);
 
@@ -545,7 +545,7 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			for(unsigned int i = 0; i < sus.size(); ++i) {
 				float path_loss = pm->getPathLoss(pus[j].prs[x].loc, sus[i].loc);
 				// std::cout << path_loss << std::endl;
-				out << "PR_PL " << j << " " << x << " " << i << " " << path_loss << std::endl;
+				out << "B " << j << " " << x << " " << i << " " << path_loss << std::endl;
 			}
 			// Delete PR file
 			utils::deleteFile(pus[j].prs[x].splat_ano_filename);
@@ -823,7 +823,6 @@ void TransmitterOnlySplatPM::loadANOFile(const PU& pu) {
 	int line_num = 1;
 	std::string line = "";
 	cur_ano_data_by_x.clear();
-	cur_ano_data_by_y.clear();
 	while(std::getline(pu_ano, line)) {
 		if(line_num > 2) {
 			// Remove last two characters if last character is '*'
@@ -851,8 +850,7 @@ void TransmitterOnlySplatPM::loadANOFile(const PU& pu) {
 			float x = (lon - ref_long) * EARTH_RADIUS * M_PI / 180.0 * cos(lat * M_PI / 180.0);
 			Location data_loc(x, y, 0);
 		
-			cur_ano_data_by_x.insert(AnoData(line_num, data_loc, pl));
-			cur_ano_data_by_y.insert(AnoData(line_num, data_loc, pl));
+			cur_ano_data_by_x.insert(AnoData(data_loc, pl));
 		}
 		line_num++;
 	}
@@ -911,7 +909,6 @@ void TransmitterOnlySplatPM::loadANOFile(const PR& pr) {
 	int line_num = 1;
 	std::string line = "";
 	cur_ano_data_by_x.clear();
-	cur_ano_data_by_y.clear();
 	while(std::getline(pr_ano, line)) {
 		if(line_num > 2) {
 			// Remove last two characters if last character is '*'
@@ -939,8 +936,7 @@ void TransmitterOnlySplatPM::loadANOFile(const PR& pr) {
 			float x = (lon - ref_long) * EARTH_RADIUS * M_PI / 180.0 * cos(lat * M_PI / 180.0);
 			Location data_loc(x, y, 0);
 
-			cur_ano_data_by_x.insert(AnoData(line_num, data_loc, pl));
-			cur_ano_data_by_y.insert(AnoData(line_num, data_loc, pl));
+			cur_ano_data_by_x.insert(AnoData(data_loc, pl));
 		}
 		line_num++;
 	}
@@ -949,7 +945,6 @@ void TransmitterOnlySplatPM::loadANOFile(const PR& pr) {
 
 float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& loc2) const {
 	typedef struct{
-		int ind;
 		float ref_dist;
 		float path_loss;
 		float pu_dist;
@@ -967,15 +962,12 @@ float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& 
 	}
 
 	std::vector<PLDataType> selected_refs;
-	
-	auto this_v = AnoData(-1, loc2, 0.0);
+
+	auto this_v = AnoData(loc2, 0.0);
 	auto x_lb = cur_ano_data_by_x.lower_bound(this_v);
 	auto x_ub = cur_ano_data_by_x.upper_bound(this_v);
-	auto y_lb = cur_ano_data_by_y.lower_bound(this_v);
-	auto y_ub = cur_ano_data_by_y.upper_bound(this_v);
 
 	--x_lb;
-	--y_lb;
 
 	while(true) {
 		// Choose from the four iterators that minimizes the diff in their dimension and advance that one.
@@ -989,18 +981,6 @@ float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& 
 			chosen_itr = "x_ub";
 		}
 
-		if(loc2.y - y_lb->loc.y < chosen_dist) {
-			chosen_value = *y_lb;
-			chosen_dist = loc2.y - y_lb->loc.y;
-			chosen_itr = "y_lb";
-		}
-
-		if(y_ub->loc.y - loc2.y < chosen_dist) {
-			chosen_value = *y_ub;
-			chosen_dist = y_ub->loc.y - loc2.y;
-			chosen_itr = "y_ub";
-		}
-
 		// Stop if there are k values in selected_ref and selected_refs.front().ref_dist is smaller than the chosen iters diff in its dimension
 		if((int) selected_refs.size() >= this->k && selected_refs.front().ref_dist < chosen_dist) {
 			break;
@@ -1010,29 +990,12 @@ float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& 
 			--x_lb;
 		} else if(chosen_itr == "x_ub") {
 			++x_ub;
-		} else if(chosen_itr == "y_lb") {
-			--y_lb;
-		} else if(chosen_itr == "y_ub") {
-			++y_ub;
-		}
-
-		bool duplicate = false;
-		for(unsigned int x = 0; x < selected_refs.size(); ++x) {
-			if(chosen_value.ind == selected_refs[x].ind) {
-				duplicate = true;
-				break;
-			}
-		}
-
-		if(duplicate) {
-			continue;
 		}
 
 		PLDataType v;
 		v.ref_dist = chosen_value.loc.dist(loc2);
 		v.path_loss = chosen_value.pl;
 		v.pu_dist = chosen_value.loc.dist(loc1);
-		v.ind = chosen_value.ind;
 
 		if((int) selected_refs.size() < this->k || v.ref_dist < selected_refs.front().ref_dist) {
 			if((int) selected_refs.size() >= this->k) {
@@ -1064,6 +1027,7 @@ float TransmitterOnlySplatPM::getPathLoss(const Location& loc1, const Location& 
 
 		path_loss += weights[i] * this_estimate / sum_weights;
 	}
+
 
 	if(utils::unit_type == utils::UnitType::ABS) {
 		return utils::fromdBm(path_loss);
