@@ -248,7 +248,7 @@ void Generator::getEntitiesFromFile(
 
 			all_sus.push_back(SU(-1, Location(x, y, z)));
 			all_sus[all_sus.size() - 1].pl_id = id;
-		} else if(token == "PU_PL") {
+		} else if(token == "PU_PL" || token == "A") {
 			int pu_id = -1, ss_id = -1;
 			float pl = 0.0;
 			sstr >> pu_id >> ss_id >> pl;
@@ -270,7 +270,7 @@ void Generator::getEntitiesFromFile(
 			}
 
 			pu_pls[v] = pl;
-		} else if(token == "PR_PL") {
+		} else if(token == "PR_PL" || token == "B") {
 			int pu_id = -1, pr_id = -1, su_id = -1;
 			float pl = 0.0;
 			sstr >> pu_id >> pr_id >> su_id >> pl;
