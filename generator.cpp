@@ -486,8 +486,16 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		out << "SU " << i << " " << sus[i].loc.x << " " << sus[i].loc.y << " " << sus[i].loc.z << std::endl;
 	}
 
+	// Time vars.
+	std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
+	std::chrono::duration<float> elapsed;
+	float elapsed_seconds, avg_secs, pred_to_finish;
+	int hrs, min;
+	float sec;
+
 	// Path losses
 	// PU -> SS
+	start = std::chrono::high_resolution_clock::now();
 	for(unsigned int j = 0; j < pus.size(); ++j) {
 		std::cout << "Outputting PU_PL " << j + 1 << " of " << pus.size() << std::endl;
 		pm->preprocessPathLoss(&(pus[j]), ss_height, j);
@@ -504,17 +512,22 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 		// Delete file
 		utils::deleteFile(pus[j].splat_ano_filename);
 
-		// Outputs the PR-PU path loss
-		// pm->preprocessPathLoss(&(pus[j]), pr_height, j);
-		// pm->loadANOFile(pus[j]);
+		// Time estimation
+		if(j < pus.size() - 1) {
+			end = std::chrono::high_resolution_clock::now();
 
-		// for(unsigned int i = 0; i < pus[j].prs.size(); ++i) {
-		// 	float path_loss = pm->getPathLoss(pus[j].loc, pus[j].prs[i].loc);
-		// 	out << "PU_PR_PL " << j << " " << i << " " << path_loss << std::endl;
-		// }
+			elapsed = end - start;
 
-		// // Delete file
-		// utils::deleteFile(pus[j].splat_ano_filename);
+			elapsed_seconds = elapsed.count();
+			avg_secs = elapsed_seconds / float(j + 1);
+			pred_to_finish  = avg_secs * float(pus.size() - j - 1);
+
+			hrs = floor(pred_to_finish / 60.0 / 60.0);
+			min = floor(pred_to_finish / 60.0 - hrs * 60.0);
+			sec = pred_to_finish - hrs * 60.0 * 60.0 - min * 60.0;
+
+			std::cout << "Remaining PU_PL Time: " << hrs << ":" << min << sec << std::endl;
+		}
 	}
 
 	// PR -> SU
@@ -536,6 +549,24 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			}
 			// Delete PR file
 			utils::deleteFile(pus[j].prs[x].splat_ano_filename);
+
+			// Time estimation
+			if(this_pr_pl < num_pr_pl - 1) {
+				end = std::chrono::high_resolution_clock::now();
+
+				elapsed = end - start;
+
+				elapsed_seconds = elapsed.count();
+				avg_secs = elapsed_seconds / float(this_pr_pl + 1);
+				pred_to_finish  = avg_secs * float(num_pr_pl - this_pr_pl - 1);
+
+				hrs = floor(pred_to_finish / 60.0 / 60.0);
+				min = floor(pred_to_finish / 60.0 - hrs * 60.0);
+				sec = pred_to_finish - hrs * 60.0 * 60.0 - min * 60.0;
+
+				std::cout << "Remaining PR_PL Time: " << hrs << ":" << min << sec << std::endl;
+			}
+
 			this_pr_pl++;
 		}
 	}
