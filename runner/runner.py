@@ -65,6 +65,7 @@ def makeDefaultExperimentParam():
 	param.pr_range = 0.0
 
 	param.location_range = 100
+	param.su_buffer = 0.0
 
 	param.out_filename = None
 	param.in_filename = None
@@ -129,6 +130,7 @@ class ExperimentParam:
 		self.pr_range = None
 
 		self.location_range = None
+		self.su_buffer = None
 
 		self.out_filename = None
 		self.in_filename = None
@@ -343,7 +345,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 			'rand_seed': 'rand_seed', 'skip_s2pc': 'skip_s2pc',
 			'central_entities': 'ces',
 			'use_gt_rp_at_ss_from_pu': 'use_gt_rp', 'use_gt_su_pu_pl': 'use_gt_su_pu_pl',
-			'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr',
+			'num_pu': 'npu', 'num_ss': 'nss', 'num_su': 'nsu', 'location_range': 'lr', 'su_buffer': 'su_buff',
 			'num_pr_per_pu': 'npr', 'pr_range': 'prr', 'out_filename': 'out', 'in_filename': 'inf',
 			'unit_type': 'ut', 'propagation_model': 'pm',
 			'ld_path_loss0': 'ld_pl0', 'ld_dist0': 'ld_d0', 'ld_gamma': 'ld_g',
@@ -390,6 +392,8 @@ def runExperiment(param, no_run = False, debug_print = False):
 					if debug_print:
 						print line.rstrip()
 				else:
+					if debug_print:
+						print 'Got output:', line[:line.find('|')]
 					result_lines.append(line)
 
 			process.wait()
@@ -603,20 +607,30 @@ if __name__ == '__main__':
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
 					'num_pr_per_pu' : [5],
 					('propagation_model', 'in_filename', 'pr_range'): pm,
+					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [3.5],
 					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
-					PL_ALPHA: [2.0], RP_ALPHA: [2.0], 'pl_est_gamma': [2.0], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+					PL_ALPHA: [2.0], RP_ALPHA: [3.5], 'pl_est_gamma': [3.5], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
 					'no_pr_thresh_update': [False], 'do_plaintext_split': [True]}
 
+			# TMP Changes
+			# default_values['pt_record_split_power'] = [True]
+			default_values['skip_s2pc'] = [True]
+			default_values[('propagation_model', 'in_filename', 'pr_range')] = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges]
+			# default_values['pt_record_split_power'] = [True]
+			# default_values['num_su'] = [100]
+
+			num_ss_test = deepcopy(default_values)
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
 			gs_test = deepcopy(default_values)
 
-			num_ss_s_test['num_ss_selection'] = [1, 10, 25, 50]
+			num_ss_test['num_ss'] = [4, 40, 400, 4000]
+			num_ss_s_test['num_ss_selection'] = [1, 5, 10, 25, 50]
 			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
 			gs_test[('grid_x', 'grid_y')] = [(v, v) for v in [10, 50, 100, 500, 1000]]
 			
-			changes += [num_ss_s_test, num_pu_s_test, gs_test]
+			changes += [num_ss_s_test] # [num_ss_s_test, num_pu_s_test, gs_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],

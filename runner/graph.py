@@ -260,6 +260,14 @@ def dbDifference(v1, v2, unit_type):
 		v2 = 10.0 * math.log(v2, 10.0)
 	return v1 - v2
 
+def absdbDifference(v1, v2, unit_type):
+	if unit_type == 'abs':
+		if v1 <= 0.0:
+			v1 = math.pow(10.0, -50.0)
+		v1 = 10.0 * math.log(v1, 10.0)
+		v2 = 10.0 * math.log(v2, 10.0)
+	return abs(v1 - v2)
+
 def pathLossError(v1, v2, unit_type):
 	if unit_type == 'abs':
 		v1 = 10.0 * math.log(v1, 10.0)
@@ -337,7 +345,7 @@ if __name__ == '__main__':
 	# Y values
 	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'), ('secure_write_time', 'swt'),
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
-				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
+				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('abs_db_diff_plain_vs_ground', 'abs_pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
 				('db_diff_plain_vs_unopt', 'pvu_db'), ('db_diff_unopt_vs_ground', 'uvg_db'),
 				('su_pr_path_loss_error', 'pr_ple'),
 				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
@@ -409,6 +417,7 @@ if __name__ == '__main__':
 						'percent_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
 						'db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
+						'abs_db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_plain_vs_unopt': (('su_transmit_power', 'plain'), ('su_transmit_power', 'uo'), 'unit_type'),
 						'db_diff_unopt_vs_ground': (('su_transmit_power', 'uo'), ('su_transmit_power', 'ground'), 'unit_type'),
@@ -419,6 +428,7 @@ if __name__ == '__main__':
 						'percent_diff_secure_vs_ground': percentDifference,
 						'db_diff_secure_vs_plain': dbDifference,
 						'db_diff_plain_vs_ground': dbDifference,
+						'abs_db_diff_plain_vs_ground': absdbDifference,
 						'db_diff_secure_vs_ground': dbDifference,
 						'db_diff_plain_vs_unopt': dbDifference,
 						'db_diff_unopt_vs_ground': dbDifference,
