@@ -30,7 +30,9 @@ MED_TEST = 'med_test'
 LARGE_TEST = 'large_test'
 
 TEST_OUTPUT= 'test_output'
-OUTPUT_RUN = 'output'
+
+OUTPUT_MED = 'output_med'
+OUTPUT_LRG = 'output_lrg'
 
 DENSITY_TEST = 'density'
 
@@ -39,7 +41,7 @@ ALL_EXPERIMENT_IDS = [TEST, ALPHA_TEST,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS,
 						PATH_LOSS_TEST, KS_TIMING, MED_TEST, LARGE_TEST,
-						TEST_OUTPUT, OUTPUT_RUN,
+						TEST_OUTPUT, OUTPUT_MED, OUTPUT_LRG,
 						DENSITY_TEST]
 
 # Change parameters
@@ -669,12 +671,24 @@ if __name__ == '__main__':
 							'location_range': [100.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
 							'out_filename': ['../gen_out/test.txt']})
-		if experiment == OUTPUT_RUN:
+		if experiment in [OUTPUT_MED, OUTPUT_LRG]:
 			pr_range = args.pr_range[0]
-			changes.append({'num_pu': [400], 'num_ss': [4000], 'num_su': [1000], 'num_pr_per_pu' : [5], 'pr_range': [pr_range],
+
+			if experiment == OUTPUT_MED:
+				num_ss = 80000
+				out_file = 'data_80k.txt'
+			elif experiment == OUTPUT_LRG:
+				num_ss = 250000
+				out_file = 'data_250k.txt'
+			else:
+				raise Exception("Invalid experiment")
+
+			changes.append({'num_pu': [400], 'num_ss': [num_ss], 'num_su': [500], 'num_pr_per_pu' : [5], 'pr_range': [pr_range],
+							'su_buffer': [100.0],
 							'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 							'propagation_model': ['single_lr'],
-							'out_filename': ['../gen_out/data_sh_50m.txt']})
+							'out_filename': ['../gen_out/' + out_file]})
+
 		if experiment == DENSITY_TEST:
 			c = {NUM_SS_SELECTION: [25], 'num_pu_selection': [10], 's2_pc_bit_count': [64], 'secure_write_algo':['proposed'],
 				('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
