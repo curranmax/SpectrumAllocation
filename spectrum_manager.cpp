@@ -30,6 +30,13 @@ using namespace osuCrypto;
 
 #define INPUT(parties, party_id, val, bit_count) parties[party_id].isLocalParty() ? parties[party_id].input<sInt>(val, bit_count) : parties[party_id].input<sInt>(bit_count)
 
+#define PRINT(prefix, var) { sInt tmp = var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { std::cout << prefix << " " << float(tmp.getValue()) / sm_params->factor << std::endl; } parties[1].getRuntime().processesQueue(); }
+
+#define GETV(pt_var, sec_var) { sInt tmp = sec_var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { pt_var = float(tmp.getValue()) / sm_params->factor; } parties[1].getRuntime().processesQueue(); }
+
+#define PDIF_LLONG(prefix, llong_v, float_v, thresh) {float pdif = fabs(float(llong_v) / sm_params->factor - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << float(llong_v) / sm_params->factor << ", " << float_v << ", " << pdif << std::endl;}}
+#define PDIF_SEC(prefix, sec_v, float_v, thresh) { sInt tmp = sec_v + sec_v - sec_v; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { float sv = float(tmp.getValue()) / sm_params->factor; float pdif = fabs(sv - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << sv << ", " << float_v << ", " << pdif << std::endl;}} parties[1].getRuntime().processesQueue(); }
+
 #define LN_TEN 2.30258509299404568401
 #define LOG_CALC_ITERS 10
 
@@ -600,6 +607,9 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 	llong factor_int = llong(sm_params->factor);
 
+	float pre_dist_scale = 1.0 / (1 << 8);
+	llong pre_dist_scale_ll = llong(pre_dist_scale * sm_params->factor);
+
 	int ds_bits = sm_params->bit_count - 2 * sm_params->float_bits - 4;
 	if(ds_bits < 0) {
 		ds_bits = 0;
@@ -611,40 +621,70 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 		std::vector<llong> rp_weights;
 		llong sum_rp_weights = 0;
 
+		std::vector<float> rrp_weights;
+		float rsum_rp_weights = 0.0;
+
 		bool all_zero = true;
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
 			// Compute weight
 			llong dist = 0;
 			float rdist = 0.0;
-			if(sm_params->rp_alpha == 2) {
-				llong x_diff = (((pus_int0[j].loc.x + pus_int1[j].loc.x) ^ bit_mask) - (((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) ^ bit_mask)) ^ bit_mask;
-				llong y_diff = (((pus_int0[j].loc.y + pus_int1[j].loc.y) ^ bit_mask) - (((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) ^ bit_mask)) ^ bit_mask;
 
-				float rx_diff = (pus_int0[j].loc.x + pus_int1[j].loc.x) / sm_params->factor - ((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) / sm_params->factor;
-				float ry_diff = (pus_int0[j].loc.y + pus_int1[j].loc.y) / sm_params->factor - ((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) / sm_params->factor;
+			llong x_diff = (((pus_int0[j].loc.x + pus_int1[j].loc.x) ^ bit_mask) - (((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) ^ bit_mask)) ^ bit_mask;
+			llong y_diff = (((pus_int0[j].loc.y + pus_int1[j].loc.y) ^ bit_mask) - (((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) ^ bit_mask)) ^ bit_mask;
 
-				dist = ((((x_diff * x_diff) ^ bit_mask) + ((y_diff * y_diff) ^ bit_mask)) / factor_int) ^ bit_mask;
-				rdist = rx_diff * rx_diff + ry_diff * ry_diff;
-				if(rdist < 0.25) {
-					std::cout << "Warning small distance detected: " << rdist << std::endl;
-				}
-				// PDIF("Dist:", rdist, dist, 0.000001);
-			} else {
-				std::cerr << "(Currently) Unsupported rp_alpha: " << sm_params->rp_alpha << std::endl;
-				exit(1);
+			float rx_diff = (pus_int0[j].loc.x + pus_int1[j].loc.x) / sm_params->factor - ((*sss_int0)[i].loc.x + (*sss_int1)[i].loc.x) / sm_params->factor;
+			float ry_diff = (pus_int0[j].loc.y + pus_int1[j].loc.y) / sm_params->factor - ((*sss_int0)[i].loc.y + (*sss_int1)[i].loc.y) / sm_params->factor;
+
+			dist = ((((x_diff * x_diff) ^ bit_mask) + ((y_diff * y_diff) ^ bit_mask)) / factor_int) ^ bit_mask;
+			rdist = rx_diff * rx_diff + ry_diff * ry_diff;
+			if(rdist < 0.25) {
+				std::cout << "Warning small distance detected: " << rdist << std::endl;
 			}
+
+			rdist = rdist * pre_dist_scale;
+
+			// TODO figure out better way to compute this value.
+			if(fabs(sm_params->rp_alpha_f - 2.0) > 0.000001) {
+				dist = (((dist * pre_dist_scale_ll) ^ bit_mask) / factor_int) ^ bit_mask;
+				dist = llong(pow(float(dist) / sm_params->factor, sm_params->rp_alpha_f / 2.0) * sm_params->factor) ^ bit_mask;
+			}
+			rdist = pow(rdist, sm_params->rp_alpha_f / 2.0);
+			PDIF_LLONG("Dist, SS " + std::to_string(i) + " PU " + std::to_string(j), dist, rdist, 0.0001);
+
+			// exit(1);
 
 			llong this_weight = 0;
+			float rthis_weight = 0.0;
 			if(dist <= 1) {
 				this_weight = (((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask;
+				rthis_weight = sm_params->factor * dist_scale;
 			} else {
 				this_weight = (((((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask) / dist) ^ bit_mask;
+				rthis_weight = dist_scale / rdist;
 			}
+
+			PDIF_LLONG("Weight, SS " + std::to_string(i) + " PU " + std::to_string(j), this_weight, rthis_weight, 0.01);
+
 			all_zero = all_zero && (this_weight == 0);
 
 			rp_weights.push_back(this_weight);
 			sum_rp_weights = (sum_rp_weights + this_weight) ^ bit_mask;
+
+			rrp_weights.push_back(rthis_weight);
+			rsum_rp_weights += rthis_weight;
 		}
+
+		while(sum_rp_weights > (llong(1) << 28) * factor_int) {
+			sum_rp_weights = (sum_rp_weights / 2) ^ bit_mask;
+			rsum_rp_weights /= 2.0;
+			for(unsigned int x = 0; x < rp_weights.size(); ++x) {
+				rp_weights[x] = (rp_weights[x] / 2) ^ bit_mask;
+				rrp_weights[x] /= 2.0;
+			}
+		}
+
+		PDIF_LLONG("Sum Weights, SS " + std::to_string(i), sum_rp_weights, rsum_rp_weights, 0.0001);
 
 		if(all_zero) {
 			std::cerr << "All rp weights are 0" << std::endl;
@@ -653,6 +693,7 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
 			llong this_rp = 0;
+			float rthis_rp = 0.0;
 			if(utils::unit_type == utils::UnitType::ABS) {
 				this_rp = (((rp_weights[j] * (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask) / sum_rp_weights) ^ bit_mask;
 			} else if(utils::unit_type == utils::UnitType::DB) {
@@ -676,11 +717,16 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 				float log_ratio_float = log10(rv * float(ratio) / sm_params->factor) - log10(rv) - log10(this_ratio_scale);
 				llong log_ratio = llong(log_ratio_float * sm_params->factor) ^ bit_mask;
 
+				float rlog_ratio = log10(rrp_weights[j] / rsum_rp_weights);
+
 				this_rp = (((10 * log_ratio) ^ bit_mask) + (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask;
+				rthis_rp = 10.0 * rlog_ratio + float((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) / sm_params->factor;
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);
 			}
+
+			PDIF_LLONG("RP, SS " + std::to_string(i) + " PU " + std::to_string(j), this_rp, rthis_rp , 0.01);
 
 			auto this_rp_split = splitInt(int(this_rp));
 			(*sss_int0)[i].received_power_from_pu.push_back(this_rp_split.first);
@@ -1074,6 +1120,7 @@ float SpectrumManager::secureRadar(
 	PWID("selecting SS");
 	std::vector<int> sss_inds;
 	std::vector<sInt> secret_sss_dists;
+	// std::vector<float> rsecret_sss_dists;
 
 	if(sm_params->selection_algo == SMParams::SelectionAlgo::NONE ||
 			sm_params->selection_algo == SMParams::SelectionAlgo::RANDOM) {
@@ -1081,6 +1128,7 @@ float SpectrumManager::secureRadar(
 			sss_inds.push_back(i);
 
 			sInt dist_to_pl_alpha = INPUT(parties, 0, 1, sm_params->bit_count);
+			// float rdist_to_pl_alpha = 0.0;
 
 			if(sm_params->pl_alpha == 1) {
 				sInt dist;
@@ -1090,6 +1138,14 @@ float SpectrumManager::secureRadar(
 			} else if(sm_params->pl_alpha == 2) {
 				sInt dist_squared = ((su_x - sss_x[i]) * (su_x - sss_x[i]) + (su_y - sss_y[i]) * (su_y - sss_y[i])) / factor_int;
 				dist_to_pl_alpha = dist_to_pl_alpha * dist_squared;
+
+				// float rsu_x = 0.0, rss_x = 0.0, rsu_y = 0.0, rss_y = 0.0;
+				// GETV(rsu_x, su_x);
+				// GETV(rsu_y, su_y);
+				// GETV(rss_x, sss_x[i]);
+				// GETV(rss_y, sss_y[i]);
+
+				// rdist_to_pl_alpha = (rsu_x - rss_x) * (rsu_x - rss_x) + (rsu_y - rss_y) * (rsu_y - rss_y);
 			} else if(sm_params->pl_alpha == 3) {
 				sInt dist;
 				utils::dist(&dist, su_x, su_y, sss_x[i], sss_y[i], zero, two, 10);
@@ -1106,7 +1162,10 @@ float SpectrumManager::secureRadar(
 				exit(0);
 			}
 
+			// PDIF_SEC("Dist", dist_to_pl_alpha, rdist_to_pl_alpha, 0.0001);
+
 			secret_sss_dists.push_back(dist_to_pl_alpha + zero);
+			// rsecret_sss_dists.push_back(rdist_to_pl_alpha);
 		}
 	} else if(sm_params->selection_algo == SMParams::SelectionAlgo::SORT) {
 		std::vector<sInt> secret_sss_inds;
@@ -1183,6 +1242,9 @@ float SpectrumManager::secureRadar(
 	std::vector<sInt> sss_w;
 	sInt sum_weight = INPUT(parties, 0, 0, sm_params->bit_count);
 
+	// std::vector<float> rsss_w;
+	// float rsum_weight = 0.0;
+
 	int ds_bits = (sm_params->bit_count - 2 * sm_params->float_bits) / 2;
 	if(ds_bits < 0) {
 		ds_bits = 0;
@@ -1197,7 +1259,16 @@ float SpectrumManager::secureRadar(
 
 		sss_w.push_back(is_dist_small.ifelse(large, secure_dist_scale * factor_int * factor_int / secret_sss_dists[x]));
 		sum_weight = sum_weight + sss_w[x];
+
+		// float rthis_weight = float(dist_scale) / rsecret_sss_dists[x];
+		// rsss_w.push_back(rthis_weight);
+		// rsum_weight += rsss_w[x];
+
+		sInt tmp_weight = sss_w[x] + zero;
+
+		// PDIF_SEC("Weight", tmp_weight, rthis_weight, 0.0001);
 	}
+	// PDIF_SEC("Sum Weight", sum_weight, rsum_weight, 0.0001);
 
 	// |--------------------------------|
 	// |  Compute transmit power of SU  |
@@ -1208,7 +1279,7 @@ float SpectrumManager::secureRadar(
 	sInt two_int = INPUT(parties, 0, 2, sm_params->bit_count);
 	std::vector<std::vector<sInt> > path_loss_su_pr; // path_loss_su_pr[i][j] is the path loss between the su and PU i's PR j.
 	
-	int dr_scale = 256;
+	int dr_scale = 32;
 	float log_dr_scale = log10(dr_scale);
 	sInt secure_dr_scale = INPUT(parties, 0, dr_scale, sm_params->bit_count);
 	sInt secure_log_dr_scale = INPUT(parties, 0, int(log_dr_scale * sm_params->factor), sm_params->bit_count);
@@ -1217,6 +1288,7 @@ float SpectrumManager::secureRadar(
 		unsigned int j = pu_inds[y];
 
 		sInt sum_weighted_ratio = INPUT(parties, 0, 0, sm_params->bit_count);
+		// float rsum_weighted_ratio = 0.0;
 
 		path_loss_su_pr.push_back(std::vector<sInt>());
 		for(unsigned int x = 0; x < sss_inds.size(); ++x) {
@@ -1227,6 +1299,11 @@ float SpectrumManager::secureRadar(
 				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * sss_rp_from_pu[i][j] / pus_tp[j];
 			} else if(utils::unit_type == utils::UnitType::DB) {
 				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] - pus_tp[j]) / factor_int;
+
+				// float rp = 0.0, tp = 0.0;
+				// GETV(rp, sss_rp_from_pu[i][j]);
+				// GETV(tp, pus_tp[j]);
+				// rsum_weighted_ratio += rsss_w[x] * (rp - tp);
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);
@@ -1235,9 +1312,20 @@ float SpectrumManager::secureRadar(
  
 		sInt pu_est_path_loss = factor_int * sum_weighted_ratio / sum_weight;
 
+		// float rpu_est_path_loss = rsum_weighted_ratio / rsum_weight;
+		// PDIF_SEC("PU PL", pu_est_path_loss, rpu_est_path_loss, 0.0001);
+
 		sInt pu_x_diff = su_x - pus_x[j];
 		sInt pu_y_diff = su_y - pus_y[j];
 		sInt su_pu_dist_squared = (pu_x_diff * pu_x_diff + pu_y_diff * pu_y_diff) / factor_int;
+
+		// float rsu_x = 0.0, rpu_x = 0.0, rsu_y = 0.0, rpu_y = 0.0;
+		// GETV(rsu_x, su_x);
+		// GETV(rsu_y, su_y);
+		// GETV(rpu_x, pus_x[j]);
+		// GETV(rpu_y, pus_y[j]);
+
+		// float rsu_pu_dist_squared = (rsu_x - rpu_x) * (rsu_x - rpu_x) + (rsu_y - rpu_y) * (rsu_y - rpu_y);
 
 		for(unsigned int x = 0; x < pus[j].prs.size(); ++x) {
 			PWID("tp PU (" + std::to_string(y) + ", " + std::to_string(x) + ")");
@@ -1245,7 +1333,19 @@ float SpectrumManager::secureRadar(
 			sInt pr_y_diff = su_y - prs_y[j][x];
 			sInt su_pr_dist_squared = (pr_x_diff * pr_x_diff + pr_y_diff * pr_y_diff) / factor_int;
 
+			// float rpr_x = 0.0, rpr_y = 0.0;
+			// GETV(rpr_x, prs_x[j][x]);
+			// GETV(rpr_y, prs_y[j][x]);
+
+			// float rsu_pr_dist_squared = (rsu_x - rpr_x) * (rsu_x - rpr_x) + (rsu_y - rpr_y) * (rsu_y - rpr_y);
+
 			sInt dist_ratio = secure_dr_scale * factor_int * su_pr_dist_squared / su_pu_dist_squared;
+
+			// float rdist_ratio = dr_scale * rsu_pr_dist_squared / rsu_pu_dist_squared;
+
+			// PDIF_SEC("PU Dist", su_pu_dist_squared, rsu_pu_dist_squared, 0.0001);
+			// PDIF_SEC("PR Dist", su_pr_dist_squared, rsu_pr_dist_squared, 0.0001);
+			// PDIF_SEC("Dist ratio", dist_ratio, rdist_ratio, 0.0001);
 
 			sInt log_dist_ratio;
 			utils::secureLog10_v2(&log_dist_ratio, dist_ratio, parties, sm_params->bit_count, sm_params->factor, factor_int);
@@ -1275,6 +1375,8 @@ float SpectrumManager::secureRadar(
 	// |-------------------------------|
 	// |  Reveal transmit power of SU  |
 	// |-------------------------------|
+	PRINT("SU_TP: ", su_tp);
+
 	PWID("send SU max_tp");
 	sInt su_tp_a = INPUT(parties, 0, splitRandVal(), sm_params->bit_count);
 	sInt su_tp_b = su_tp - su_tp_a;
@@ -1354,6 +1456,7 @@ float SpectrumManager::secureRadar(
 		}
 	}
 	secureTableWrite(parties, pu_table, updates, sm_ch);
+
 	return max_su_tp;
 }
 
