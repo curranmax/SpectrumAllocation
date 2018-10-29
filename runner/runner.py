@@ -587,52 +587,47 @@ if __name__ == '__main__':
 							'num_su': [100]})
 
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS, SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
-			pr_ranges = [100]
-
 			num_su = 100
 			if experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				num_su = 2
 
-			grid_size = 1000
+			grid_size = 100
 			if experiment in [SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
 				grid_size = 100
 
 			if experiment in [FULL_TEST_TWO_SMS, SMALL_GRID_TWO_SMS]:
-				pm = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges] + \
-							[('log_distance', None, pr_range) for pr_range in pr_ranges]
+				pm = [('input_file', '../gen_out/data_80k.txt'), ('log_distance', None)]
 			elif experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
-				pm = [('log_distance', None, pr_range) for pr_range in pr_ranges]
+				pm = [('log_distance', None)]
 			else:
 				raise Exception('Unknown experiment')
 
 			default_values = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
 					('grid_x', 'grid_y'): [(grid_size, grid_size)], 'selection_algo': ['none'],
-					'num_pr_per_pu' : [5],
-					('propagation_model', 'in_filename', 'pr_range'): pm,
+					'num_pr_per_pu' : [5], 'pr_range': [100.0], 'su_buffer': [100.0],
+					('propagation_model', 'in_filename'): pm,
 					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [3.5],
-					'num_pu': [400], 'num_ss': [4000], 'num_su': [num_su],
+					'num_pu': [400], 'num_ss': [40000], 'num_su': [num_su],
 					PL_ALPHA: [2.0], RP_ALPHA: [3.5], 'pl_est_gamma': [3.5], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
 					'central_entities': (['two_sms'] if experiment == FULL_TEST_TWO_SMS or experiment == SMALL_GRID_TWO_SMS else ['sm_ks']),
 					'no_pr_thresh_update': [False], 'do_plaintext_split': [True]}
 
 			# TMP Changes
 			# default_values['pt_record_split_power'] = [True]
-			default_values['skip_s2pc'] = [True]
-			default_values[('propagation_model', 'in_filename', 'pr_range')] = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges]
+			# default_values['skip_s2pc'] = [True]
+			# default_values[('propagation_model', 'in_filename', 'pr_range')] = [('input_file', '../gen_out/data_sh_' + str(pr_range) + 'm.txt', float(pr_range)) for pr_range in pr_ranges]
 			# default_values['pt_record_split_power'] = [True]
 			# default_values['num_su'] = [100]
 
-			num_ss_test = deepcopy(default_values)
 			num_ss_s_test = deepcopy(default_values)
 			num_pu_s_test = deepcopy(default_values)
 			gs_test = deepcopy(default_values)
 
-			num_ss_test['num_ss'] = [4, 40, 400, 4000]
-			num_ss_s_test['num_ss_selection'] = [1, 5, 10, 25, 50]
-			num_pu_s_test['num_pu_selection'] = [1, 10, 25, 50]
+			num_ss_s_test['num_ss_selection'] = [1, 3, 5, 7, 10, 15]
+			num_pu_s_test['num_pu_selection'] = [1, 3, 5, 7, 10, 15]
 			gs_test[('grid_x', 'grid_y')] = [(v, v) for v in [10, 50, 100, 500, 1000]]
 			
-			changes += [num_ss_s_test] # [num_ss_s_test, num_pu_s_test, gs_test]
+			changes += [num_ss_s_test, num_pu_s_test, gs_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
