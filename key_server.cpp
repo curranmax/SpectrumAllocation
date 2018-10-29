@@ -36,10 +36,10 @@ void KeyServer::encryptAndInit(Entity* en) {
 }
 
 void KeyServer::encrypt(Entity* en) {
-	// if(!en->fullEncrypt()) {
-	// 	// TODO XOR with some value
-	// 	return;
-	// }
+	if(!en->fullEncrypt()) {
+		// TODO XOR with some value
+		return;
+	}
 
 	// pt_vs is the plaintext values of en. en_vs will be the encrypted version of
 	std::vector<int> pt_vs = en->getKsValues();
@@ -86,10 +86,10 @@ void KeyServer::encrypt(Entity* en) {
 }
 
 void KeyServer::decrypt(Entity* en) {
-	// if(!en->fullEncrypt()) {
-	// // 	// TODO XOR with some value
-	// 	return;
-	// }
+	if(!en->fullEncrypt()) {
+		// TODO XOR with some value
+		return;
+	}
 
 	std::vector<int> en_vs = en->getKsValues();
 	std::vector<int> pt_vs(en_vs.size());

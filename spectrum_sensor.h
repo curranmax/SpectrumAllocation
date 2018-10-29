@@ -51,7 +51,7 @@ public:
 	int getID() const { return global_id; }
 	void setID(int new_id) { global_id = new_id; }
 
-	bool fullEncrypt() const { return false; }
+	bool fullEncrypt() const { return true; }
 	
 	std::vector<int> getValues() const {
 		std::vector<int> values;
