@@ -44,6 +44,7 @@ public:
 		this->received_power = ss.received_power;
 		this->received_power_from_pu = ss.received_power_from_pu;
 		this->global_id = global_id;
+		
 		return *this;
 	}
 

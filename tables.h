@@ -12,6 +12,14 @@ class GridTable {
 public:
 	GridTable() : sss(), pu_refs() {}
 	~GridTable() {}
+
+	GridTable(const GridTable& gt) : sss(gt.sss), pu_refs(gt.pu_refs) {}
+	const GridTable& operator=(const GridTable& gt) {
+		sss = gt.sss;
+		pu_refs = gt.pu_refs;
+
+		return *this;
+	}
 	
 	std::map<int, std::vector<SSint> > sss;
 	std::map<int, std::vector<int> > pu_refs;

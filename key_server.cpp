@@ -50,9 +50,13 @@ void KeyServer::encrypt(Entity* en) {
 	for(unsigned int i = 0; i < pt_vs.size(); ++i) {
 		toBytes(pt_vs[i], &bytes);
 
-		auto this_aes_vals = aes_vals.find(en->getID());
+		// TMP fix
+		int this_id = en->getID();
+		if(this_id == -1) { this_id = 0; }
+
+		auto this_aes_vals = aes_vals.find(this_id);
 		if(this_aes_vals == aes_vals.end()) {
-			std::cerr << "No aes vals for: " << en->getID() << std::endl;
+			std::cerr << "No aes vals for: " << en->getID() << ", " << en->getType() << std::endl;
 			exit(1);
 		}
 
@@ -98,9 +102,13 @@ void KeyServer::decrypt(Entity* en) {
 	for(unsigned int i = 0; i < en_vs.size(); ++i) {
 		toBytes(en_vs[i], &bytes);
 
-		auto this_aes_vals = aes_vals.find(en->getID());
+		// TMP fix
+		int this_id = en->getID();
+		if(this_id == -1) { this_id = 0; }
+
+		auto this_aes_vals = aes_vals.find(this_id);
 		if(this_aes_vals == aes_vals.end()) {
-			std::cerr << "No aes vals for: " << en->getID() << std::endl;
+			std::cerr << "No aes vals for: " << en->getID() << ", " << en->getType() << std::endl;
 			exit(1);
 		}
 		this_aes_vals->second->decryptor().ProcessData(bytes.data(), bytes.data(), bytes.size());
