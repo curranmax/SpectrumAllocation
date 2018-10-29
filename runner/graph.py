@@ -347,7 +347,7 @@ if __name__ == '__main__':
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
 				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('abs_db_diff_plain_vs_ground', 'abs_pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
 				('db_diff_plain_vs_unopt', 'pvu_db'), ('db_diff_unopt_vs_ground', 'uvg_db'),
-				('su_pr_path_loss_error', 'pr_ple'),
+				('su_pr_path_loss_error', 'pr_ple'), ('su_pr_abs_path_loss_error', 'abs_pr_ple'),
 				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
 				('recvEncryptedData_recv', 'red_r'), ('recvEncryptedData_decrypt', 'red_d'), ('sendEncryptedPRThresholds', 'sepr'),
 				('rp_split_dif', 'rsd')]
@@ -422,7 +422,8 @@ if __name__ == '__main__':
 						'db_diff_plain_vs_unopt': (('su_transmit_power', 'plain'), ('su_transmit_power', 'uo'), 'unit_type'),
 						'db_diff_unopt_vs_ground': (('su_transmit_power', 'uo'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'rp_split_dif': ('rp_at_ss_from_pu', 'rp_at_ss_from_pu_pt', 'unit_type'),
-						'su_pr_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type')}
+						'su_pr_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type'),
+						'su_pr_abs_path_loss_error': (('su_pr_path_loss', 'plain'), ('su_pr_path_loss', 'ground'), 'unit_type'),}
 	complex_y_funcs = {'percent_diff_secure_vs_plain': percentDifference,
 						'percent_diff_plain_vs_ground': percentDifference,
 						'percent_diff_secure_vs_ground': percentDifference,
@@ -433,7 +434,8 @@ if __name__ == '__main__':
 						'db_diff_plain_vs_unopt': dbDifference,
 						'db_diff_unopt_vs_ground': dbDifference,
 						'rp_split_dif': dbDifference,
-						'su_pr_path_loss_error': pathLossError}
+						'su_pr_path_loss_error': pathLossError,
+						'su_pr_abs_path_loss_error': lambda x, y, z: abs(pathLossError(x, y, z))}
 	this_y_value = None
 	for full_yv, _ in y_values:
 		if getattr(args, 'use_' + full_yv + '_for_y_value'):
