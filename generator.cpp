@@ -526,11 +526,12 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 			min = floor(pred_to_finish / 60.0 - hrs * 60.0);
 			sec = pred_to_finish - hrs * 60.0 * 60.0 - min * 60.0;
 
-			std::cout << "Remaining PU_PL Time: " << hrs << ":" << min << sec << std::endl;
+			std::cout << "Remaining PU_PL Time: " << hrs << ":" << min << ":" << sec << std::endl;
 		}
 	}
 
 	// PR -> SU
+	start = std::chrono::high_resolution_clock::now();
 	int num_pr_pl = 0;
 	for(unsigned int j = 0; j < pus.size(); ++j) {
 		num_pr_pl += pus[j].prs.size();
@@ -564,7 +565,7 @@ void Generator::outputEntities(const std::string& out_filename, std::vector<PU>&
 				min = floor(pred_to_finish / 60.0 - hrs * 60.0);
 				sec = pred_to_finish - hrs * 60.0 * 60.0 - min * 60.0;
 
-				std::cout << "Remaining PR_PL Time: " << hrs << ":" << min << sec << std::endl;
+				std::cout << "Remaining PR_PL Time: " << hrs << ":" << min << ":" << sec << std::endl;
 			}
 
 			this_pr_pl++;

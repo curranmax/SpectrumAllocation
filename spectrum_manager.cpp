@@ -32,10 +32,10 @@ using namespace osuCrypto;
 
 #define PRINT(prefix, var) { sInt tmp = var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { std::cout << prefix << " " << float(tmp.getValue()) / sm_params->factor << std::endl; } parties[1].getRuntime().processesQueue(); }
 
-#define GETV(pt_var, sec_var) { sInt tmp = sec_var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { pt_var = float(tmp.getValue()) / sm_params->factor; } parties[1].getRuntime().processesQueue(); }
+// #define GETV(pt_var, sec_var) { sInt tmp = sec_var + zero; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { pt_var = float(tmp.getValue()) / sm_params->factor; } parties[1].getRuntime().processesQueue(); }
 
-#define PDIF_LLONG(prefix, llong_v, float_v, thresh) {float pdif = fabs(float(llong_v) / sm_params->factor - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << float(llong_v) / sm_params->factor << ", " << float_v << ", " << pdif << std::endl;}}
-#define PDIF_SEC(prefix, sec_v, float_v, thresh) { sInt tmp = sec_v + sec_v - sec_v; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { float sv = float(tmp.getValue()) / sm_params->factor; float pdif = fabs(sv - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << sv << ", " << float_v << ", " << pdif << std::endl;}} parties[1].getRuntime().processesQueue(); }
+// #define PDIF_LLONG(prefix, llong_v, float_v, thresh) {float pdif = fabs(float(llong_v) / sm_params->factor - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << float(llong_v) / sm_params->factor << ", " << float_v << ", " << pdif << std::endl;}}
+// #define PDIF_SEC(prefix, sec_v, float_v, thresh) { sInt tmp = sec_v + sec_v - sec_v; parties[0].reveal(tmp); if(parties[0].isLocalParty()) { float sv = float(tmp.getValue()) / sm_params->factor; float pdif = fabs(sv - float_v) / fabs(float_v); if(pdif > thresh) { std::cout << prefix << " : " << sv << ", " << float_v << ", " << pdif << std::endl;}} parties[1].getRuntime().processesQueue(); }
 
 #define LN_TEN 2.30258509299404568401
 #define LOG_CALC_ITERS 10
@@ -621,8 +621,8 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 		std::vector<llong> rp_weights;
 		llong sum_rp_weights = 0;
 
-		std::vector<float> rrp_weights;
-		float rsum_rp_weights = 0.0;
+		// std::vector<float> rrp_weights;
+		// float rsum_rp_weights = 0.0;
 
 		bool all_zero = true;
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
@@ -642,49 +642,49 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 				std::cout << "Warning small distance detected: " << rdist << std::endl;
 			}
 
-			rdist = rdist * pre_dist_scale;
+			// rdist = rdist * pre_dist_scale;
 
 			// TODO figure out better way to compute this value.
 			if(fabs(sm_params->rp_alpha_f - 2.0) > 0.000001) {
 				dist = (((dist * pre_dist_scale_ll) ^ bit_mask) / factor_int) ^ bit_mask;
 				dist = llong(pow(float(dist) / sm_params->factor, sm_params->rp_alpha_f / 2.0) * sm_params->factor) ^ bit_mask;
 			}
-			rdist = pow(rdist, sm_params->rp_alpha_f / 2.0);
-			PDIF_LLONG("Dist, SS " + std::to_string(i) + " PU " + std::to_string(j), dist, rdist, 0.0001);
+			// rdist = pow(rdist, sm_params->rp_alpha_f / 2.0);
+			// PDIF_LLONG("Dist, SS " + std::to_string(i) + " PU " + std::to_string(j), dist, rdist, 0.0001);
 
 			// exit(1);
 
 			llong this_weight = 0;
-			float rthis_weight = 0.0;
+			// float rthis_weight = 0.0;
 			if(dist <= 1) {
 				this_weight = (((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask;
-				rthis_weight = sm_params->factor * dist_scale;
+				// rthis_weight = sm_params->factor * dist_scale;
 			} else {
 				this_weight = (((((factor_int * factor_int) ^ bit_mask) * dist_scale) ^ bit_mask) / dist) ^ bit_mask;
-				rthis_weight = dist_scale / rdist;
+				// rthis_weight = dist_scale / rdist;
 			}
 
-			PDIF_LLONG("Weight, SS " + std::to_string(i) + " PU " + std::to_string(j), this_weight, rthis_weight, 0.01);
+			// PDIF_LLONG("Weight, SS " + std::to_string(i) + " PU " + std::to_string(j), this_weight, rthis_weight, 0.01);
 
 			all_zero = all_zero && (this_weight == 0);
 
 			rp_weights.push_back(this_weight);
 			sum_rp_weights = (sum_rp_weights + this_weight) ^ bit_mask;
 
-			rrp_weights.push_back(rthis_weight);
-			rsum_rp_weights += rthis_weight;
+			// rrp_weights.push_back(rthis_weight);
+			// rsum_rp_weights += rthis_weight;
 		}
 
 		while(sum_rp_weights > (llong(1) << 28) * factor_int) {
 			sum_rp_weights = (sum_rp_weights / 2) ^ bit_mask;
-			rsum_rp_weights /= 2.0;
+			// rsum_rp_weights /= 2.0;
 			for(unsigned int x = 0; x < rp_weights.size(); ++x) {
 				rp_weights[x] = (rp_weights[x] / 2) ^ bit_mask;
-				rrp_weights[x] /= 2.0;
+				// rrp_weights[x] /= 2.0;
 			}
 		}
 
-		PDIF_LLONG("Sum Weights, SS " + std::to_string(i), sum_rp_weights, rsum_rp_weights, 0.0001);
+		// PDIF_LLONG("Sum Weights, SS " + std::to_string(i), sum_rp_weights, rsum_rp_weights, 0.0001);
 
 		if(all_zero) {
 			std::cerr << "All rp weights are 0" << std::endl;
@@ -693,7 +693,7 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
 			llong this_rp = 0;
-			float rthis_rp = 0.0;
+			// float rthis_rp = 0.0;
 			if(utils::unit_type == utils::UnitType::ABS) {
 				this_rp = (((rp_weights[j] * (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask) / sum_rp_weights) ^ bit_mask;
 			} else if(utils::unit_type == utils::UnitType::DB) {
@@ -717,16 +717,16 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 				float log_ratio_float = log10(rv * float(ratio) / sm_params->factor) - log10(rv) - log10(this_ratio_scale);
 				llong log_ratio = llong(log_ratio_float * sm_params->factor) ^ bit_mask;
 
-				float rlog_ratio = log10(rrp_weights[j] / rsum_rp_weights);
+				// float rlog_ratio = log10(rrp_weights[j] / rsum_rp_weights);
 
 				this_rp = (((10 * log_ratio) ^ bit_mask) + (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask;
-				rthis_rp = 10.0 * rlog_ratio + float((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) / sm_params->factor;
+				// rthis_rp = 10.0 * rlog_ratio + float((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) / sm_params->factor;
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
 				exit(1);
 			}
 
-			PDIF_LLONG("RP, SS " + std::to_string(i) + " PU " + std::to_string(j), this_rp, rthis_rp , 0.01);
+			// PDIF_LLONG("RP, SS " + std::to_string(i) + " PU " + std::to_string(j), this_rp, rthis_rp , 0.01);
 
 			auto this_rp_split = splitInt(int(this_rp));
 			(*sss_int0)[i].received_power_from_pu.push_back(this_rp_split.first);
@@ -2245,6 +2245,7 @@ std::vector<float> PlaintextSpectrumManager::unoptimizedPlaintextRun(const std::
 
 void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const std::vector<PU>& pus, const std::vector<SS>& sss,
 		std::map<int, std::vector<int> >* pu_int_groups, std::map<int, std::vector<int> >* ss_int_groups) const {
+
 	std::set<std::pair<int, int> > grid_locs_to_compute;
 	if(sus.size() > 0) {
 		for(unsigned int i = 0; i < sus.size(); ++i) {
@@ -2260,6 +2261,40 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const s
 		}
 	}
 
+	class LocInd{
+	public:
+		LocInd() : loc(),  ind() {}
+		~LocInd() {}
+
+		LocInd(const Location& _loc, int _ind) : loc(_loc), ind(_ind) {}
+		LocInd(const LocInd& locind) : loc(locind.loc), ind(locind.ind) {}
+
+		const LocInd& operator=(const LocInd& locind) { loc = locind.loc; ind = locind.ind; return *this; }
+
+		Location loc;
+		int ind;
+	};
+
+	struct LocIndSort {
+		bool operator()(const LocInd& v1, const LocInd& v2) const {
+			if(v1.loc.x == v2.loc.x) {
+				return v1.loc.y < v2.loc.y;
+			}
+			return v1.loc.x < v2.loc.x;
+		}
+	};
+
+	std::set<LocInd, LocIndSort> sorted_pus;
+	std::set<LocInd, LocIndSort> sorted_sss;
+
+	for(unsigned int i = 0; i < pus.size(); ++i) {
+		sorted_pus.insert(LocInd(pus[i].loc, i));
+	}
+
+	for(unsigned int i = 0; i < sss.size(); ++i) {
+		sorted_sss.insert(LocInd(sss[i].loc, i));
+	}
+
 	struct comp {
 		bool operator()(const std::pair<float, int>& v1, const std::pair<float, int>& v2) const {
 			return v1.first < v2.first;
@@ -2269,10 +2304,44 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const s
 	// PU Groups
 	for(auto itr = grid_locs_to_compute.begin(); itr != grid_locs_to_compute.end(); ++itr) {
 		int x = itr->first, y = itr->second;
+
 		std::vector<std::pair<float, int> > pu_vals;
 
-		for(unsigned int i = 0; i < pus.size(); ++i) {
-			float this_dist = pus[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
+		Location grid_loc((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y);
+		LocInd grid_locind(grid_loc, -1);
+		auto lb_itr = sorted_pus.lower_bound(grid_locind);
+		auto ub_itr = sorted_pus.upper_bound(grid_locind);
+
+		bool lb_done = (lb_itr == sorted_pus.begin());
+		bool ub_done = (ub_itr == sorted_pus.end());
+
+		--lb_itr;
+
+		while(true) {
+			if(lb_done && ub_done) {
+				break;
+			}
+
+			// TODO must check that lb_itr and/or ub_itr haven't passed the edge.
+			auto chosen_val = *lb_itr;
+			float chosen_dist = grid_loc.x - lb_itr->loc.x;
+
+			if(lb_done || (!ub_done && ub_itr->loc.x - grid_loc.x < chosen_dist)) {
+				chosen_val = *ub_itr;
+				chosen_dist = ub_itr->loc.x - grid_loc.x;
+
+				++ub_itr;
+				ub_done = (ub_itr == sorted_pus.end());
+			} else {
+				lb_done = (lb_itr == sorted_pus.begin());
+				--lb_itr;
+			}
+
+			if((int) pu_vals.size() >= sm_params->grid_min_num_pu && pu_vals.front().first < chosen_dist) {
+				break;
+			}
+
+			float this_dist = chosen_val.loc.dist(grid_loc);
 
 			if((int) pu_vals.size() < sm_params->grid_min_num_pu || this_dist < pu_vals.front().first) {
 				if((int) pu_vals.size() >= sm_params->grid_min_num_pu) {
@@ -2280,7 +2349,7 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const s
 					pu_vals.pop_back();
 				}
 
-				pu_vals.push_back(std::make_pair(this_dist, i));
+				pu_vals.push_back(std::make_pair(this_dist, chosen_val.ind));
 				std::push_heap(pu_vals.begin(), pu_vals.end(), comp());
 			}
 		}
@@ -2296,16 +2365,49 @@ void PlaintextSpectrumManager::plainTextGrid(const std::vector<SU>& sus, const s
 		int x = itr->first, y = itr->second;
 		std::vector<std::pair<float, int>> ss_vals;
 
-		for(unsigned int i = 0; i < sss.size(); ++i) {
-			float this_dist = sss[i].loc.dist(Location((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y));
+		Location grid_loc((x + 0.5) * sm_params->grid_delta_x, (y + 0.5) * sm_params->grid_delta_y);
+		LocInd grid_locind(grid_loc, -1);
+		auto lb_itr = sorted_sss.lower_bound(grid_locind);
+		auto ub_itr = sorted_sss.upper_bound(grid_locind);
+
+		bool lb_done = (lb_itr == sorted_sss.begin());
+		bool ub_done = (ub_itr == sorted_sss.end());
+
+		--lb_itr;
+
+		while(true) {
+			if(lb_done && ub_done) {
+				break;
+			}
+
+			// TODO must check that lb_itr and/or ub_itr haven't passed the edge.
+			auto chosen_val = *lb_itr;
+			float chosen_dist = grid_loc.x - lb_itr->loc.x;
+
+			if(lb_done || (!ub_done && ub_itr->loc.x - grid_loc.x < chosen_dist)) {
+				chosen_val = *ub_itr;
+				chosen_dist = ub_itr->loc.x - grid_loc.x;
+
+				++ub_itr;
+				ub_done = (ub_itr == sorted_sss.end());
+			} else {
+				lb_done = (lb_itr == sorted_sss.begin());
+				--lb_itr;
+			}
+
+			if((int) ss_vals.size() >= sm_params->grid_min_num_pu && ss_vals.front().first < chosen_dist) {
+				break;
+			}
+
+			float this_dist = chosen_val.loc.dist(grid_loc);
 
 			if((int) ss_vals.size() < sm_params->grid_min_num_ss || this_dist < ss_vals.front().first) {
-				if((int) ss_vals.size() >= sm_params->grid_min_num_ss) {
+				if((int) ss_vals.size() >= sm_params->grid_min_num_pu) {
 					std::pop_heap(ss_vals.begin(), ss_vals.end(), comp());
 					ss_vals.pop_back();
 				}
 
-				ss_vals.push_back(std::make_pair(this_dist, i));
+				ss_vals.push_back(std::make_pair(this_dist, chosen_val.ind));
 				std::push_heap(ss_vals.begin(), ss_vals.end(), comp());
 			}
 		}
