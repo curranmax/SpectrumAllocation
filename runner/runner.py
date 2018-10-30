@@ -551,10 +551,10 @@ if __name__ == '__main__':
 	for experiment in experiments:
 		if experiment == TEST:
 			changes.append({NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('grid_x', 'grid_y', 'selection_algo'): [(100, 100, 'none')],
-							'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/test.txt'],
-							'num_pu': [4], PL_ALPHA: [2], RP_ALPHA: [2],
-							'location_range': [1000.0], 'num_ss': [400], 'num_su': [1], 'unit_type': ['db'],
-							'num_pr_per_pu': [5], 'pr_range': [10.0]})
+							'propagation_model': ['input_file'], 'in_filename' : ['../gen_out/data_80k.txt'],
+							'num_pu': [400], PL_ALPHA: [3.5], RP_ALPHA: [3.5],
+							'location_range': [10.0 * 1000.0], 'num_ss': [40000], 'num_su': [1], 'unit_type': ['db'],
+							'num_pr_per_pu': [5], 'pr_range': [100.0]})
 
 		if experiment == ALPHA_TEST:
 			rp_alphas = []
@@ -596,7 +596,7 @@ if __name__ == '__main__':
 				grid_size = 100
 
 			if experiment in [FULL_TEST_TWO_SMS, SMALL_GRID_TWO_SMS]:
-				pm = [('input_file', '../gen_out/data_80k.txt'), ('log_distance', None)]
+				pm = [('log_distance', None)] # [('input_file', '../gen_out/data_80k.txt'), ('log_distance', None)]
 			elif experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				pm = [('log_distance', None)]
 			else:
@@ -623,11 +623,12 @@ if __name__ == '__main__':
 			num_pu_s_test = deepcopy(default_values)
 			gs_test = deepcopy(default_values)
 
-			num_ss_s_test['num_ss_selection'] = [1, 3, 5, 7, 10, 15]
+			# num_ss_s_test['num_ss_selection'] = [1, 3, 5, 7, 10, 15]
+			num_ss_s_test['num_ss_selection'] = [10]
 			num_pu_s_test['num_pu_selection'] = [1, 3, 5, 7, 10, 15]
 			gs_test[('grid_x', 'grid_y')] = [(v, v) for v in [10, 50, 100, 500, 1000]]
 			
-			changes += [num_ss_s_test, num_pu_s_test, gs_test]
+			changes += [num_ss_s_test] # , num_pu_s_test, gs_test]
 
 		if experiment == PATH_LOSS_TEST:
 			changes.append({NUM_SS_SELECTION: [1, 10, 25, 50], 'num_pu_selection': [25], ('grid_x', 'grid_y'): [(1000, 1000)],
