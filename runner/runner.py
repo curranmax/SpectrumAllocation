@@ -596,7 +596,7 @@ if __name__ == '__main__':
 				grid_size = 100
 
 			if experiment in [FULL_TEST_TWO_SMS, SMALL_GRID_TWO_SMS]:
-				pm = [('input_file', '../gen_out/data_80k.txt'), ('log_distance', None)]
+				pm = [('log_distance'), None] # [('input_file', '../gen_out/data_80k.txt'), ('log_distance', None)]
 			elif experiment in [FULL_TEST_SM_KS, SMALL_GRID_SM_KS]:
 				pm = [('log_distance', None)]
 			else:
