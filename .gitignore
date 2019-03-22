@@ -1,11 +1,13 @@
 *.o
 s2pc
+s2pc_stable
 
 *.pyc
 runner/graphs/*
 runner/data/*
 
 test_estimation/*
+bit_calculation/*
 
 splat/*.qth
 splat/*.txt
