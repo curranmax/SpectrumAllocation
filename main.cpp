@@ -94,6 +94,7 @@ int main(int argc, char const *argv[]) {
 	sm_params.setSelectionAlgo(args.selection_algo);
 
 	sm_params.setSecureWriteAlgo(args.secure_write_algo);
+	sm_params.setPowerSplittingMethod(args.power_splitting_method);
 	sm_params.no_pr_thresh_update = args.no_pr_thresh_update;
 	sm_params.pl_est_gamma = args.pl_est_gamma;
 	sm_params.pt_record_split_power = args.pt_record_split_power;

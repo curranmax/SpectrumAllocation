@@ -692,10 +692,17 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 		}
 
 		for(unsigned int j = 0; j < pus_int0.size(); ++j) {
-			llong this_rp = 0;
+			llong this_rp_value = 0;
 			// float rthis_rp = 0.0;
 			if(utils::unit_type == utils::UnitType::ABS) {
-				this_rp = (((rp_weights[j] * (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask) / sum_rp_weights) ^ bit_mask;
+				if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::OFFLINE) {
+					this_rp_value = (((rp_weights[j] * (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask) / sum_rp_weights) ^ bit_mask;
+				} else if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::ONLINE) {
+					this_rp_value = (rp_weights[j] / sum_rp_weights) ^ bit_mask;
+				} else {
+					std::cerr << "Unknown power_splitting_method: " << sm_params->power_splitting_method << std::endl;
+					exit(1);
+				}
 			} else if(utils::unit_type == utils::UnitType::DB) {
 
 				// Numerical calculates the log_10 of rp_weights[j] / sum_rp_weights.
@@ -719,7 +726,14 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 				// float rlog_ratio = log10(rrp_weights[j] / rsum_rp_weights);
 
-				this_rp = (((10 * log_ratio) ^ bit_mask) + (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask;
+				if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::OFFLINE) {
+					this_rp_value = (((10 * log_ratio) ^ bit_mask) + (((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) ^ bit_mask)) ^ bit_mask;
+				} else if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::ONLINE) {
+					this_rp_value = (10 * log_ratio) ^ bit_mask;
+				} else {
+					std::cerr << "Unknown power_splitting_method: " << sm_params->power_splitting_method << std::endl;
+					exit(1);
+				}
 				// rthis_rp = 10.0 * rlog_ratio + float((*sss_int0)[i].received_power + (*sss_int1)[i].received_power) / sm_params->factor;
 			} else {
 				std::cerr << "Unsupported unit_type" << std::endl;
@@ -728,7 +742,7 @@ void PlaintextSpectrumManager::plainTextRadarPreprocess(
 
 			// PDIF_LLONG("RP, SS " + std::to_string(i) + " PU " + std::to_string(j), this_rp, rthis_rp , 0.01);
 
-			auto this_rp_split = splitInt(int(this_rp));
+			auto this_rp_split = splitInt(int(this_rp_value));
 			(*sss_int0)[i].received_power_from_pu.push_back(this_rp_split.first);
 			(*sss_int1)[i].received_power_from_pu.push_back(this_rp_split.second);
 		}
@@ -1043,9 +1057,17 @@ float SpectrumManager::secureRadar(
 	}
 
 	// Get the preprocessing values.
+	std::vector<sInt> sss_total_rp;
 	std::vector<std::vector<sInt> > sss_rp_from_pu;
 	for(unsigned int x = 0; x < sss_load_inds.size(); ++x) {
 		int i = sss_load_inds[x];
+
+		if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::ONLINE) {
+			sInt sss_rp_a = INPUT(parties, 0, sss[i].received_power, sm_params->bit_count);
+			sInt sss_rp_b = INPUT(parties, 1, sss[i].received_power, sm_params->bit_count);
+
+			sss_total_rp.push_back(sss_rp_a + sss_rp_b);
+		}
 
 		sss_rp_from_pu.push_back(std::vector<sInt>());
 		for(unsigned int j = 0; j < pus.size(); ++j) {
@@ -1296,9 +1318,24 @@ float SpectrumManager::secureRadar(
 			unsigned int i = sss_inds[x];
 
 			if(utils::unit_type == utils::UnitType::ABS) {
-				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * sss_rp_from_pu[i][j] / pus_tp[j];
+				if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::OFFLINE) {
+					sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * sss_rp_from_pu[i][j] / pus_tp[j];
+				} else if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::ONLINE) {
+					sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] * sss_total_rp[i] / factor_int) / pus_tp[j];
+				} else {
+					std::cerr << "Unknown power_splitting_method: " << sm_params->power_splitting_method << std::endl;
+					exit(1);
+				}
 			} else if(utils::unit_type == utils::UnitType::DB) {
-				sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] - pus_tp[j]) / factor_int;
+				if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::OFFLINE) {
+					sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] - pus_tp[j]) / factor_int;
+				} else if(sm_params->power_splitting_method == SMParams::PowerSplittingMethod::ONLINE) {
+					// In this case, sss_rp_from_pu[i][j] is the splitting ratio in dB
+					sum_weighted_ratio = sum_weighted_ratio + sss_w[x] * (sss_rp_from_pu[i][j] + sss_total_rp[i] - pus_tp[j]) / factor_int;
+				} else {
+					std::cerr << "Unknown power_splitting_method: " << sm_params->power_splitting_method << std::endl;
+					exit(1);
+				}
 
 				// float rp = 0.0, tp = 0.0;
 				// GETV(rp, sss_rp_from_pu[i][j]);

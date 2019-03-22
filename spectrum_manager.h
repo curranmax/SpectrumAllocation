@@ -32,10 +32,15 @@ public:
 		SPC
 	};
 
+	enum PowerSplittingMethod {
+		ONLINE,
+		OFFLINE
+	};
+
 	SMParams() = delete;
 	SMParams(float _factor, int _float_bits, int _bit_count, int _num_pu_selection, int _num_ss_selection, float _rp_alpha, float _pl_alpha, bool _brief_out) :
 			brief_out(_brief_out), factor(_factor), float_bits(_float_bits), bit_count(_bit_count), num_ss_selection(_num_ss_selection), num_pu_selection(_num_pu_selection),
-			rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), rp_alpha_f(_rp_alpha), pl_alpha_f(_pl_alpha), pl_est_gamma(0.0), no_pr_thresh_update(false), pt_record_split_power(false), selection_algo(NONE), secure_write_algo(PROPOSED),
+			rp_alpha(_rp_alpha), pl_alpha(_pl_alpha), rp_alpha_f(_rp_alpha), pl_alpha_f(_pl_alpha), pl_est_gamma(0.0), no_pr_thresh_update(false), pt_record_split_power(false), selection_algo(NONE), secure_write_algo(PROPOSED), power_splitting_method(OFFLINE),
 			use_grid(false), grid_min_num_pu(0), grid_min_num_ss(0), grid_num_x(0), grid_num_y(0), grid_delta_x(0), grid_delta_y(0),
 			num_io_threads(0), server_addr(""), connection_name(""), channel_name("") {}
 
@@ -53,6 +58,12 @@ public:
 		if(algo_string == "proposed") { secure_write_algo = SecureWriteAlgo::PROPOSED; }
 		else if(algo_string == "spc") { secure_write_algo = SecureWriteAlgo::SPC; }
 		else { std::cerr << "Unknown secure_write_algo: " << algo_string << std::endl; exit(1); }
+	}
+
+	void setPowerSplittingMethod(const std::string method_string) {
+		if(method_string == "online") { power_splitting_method = PowerSplittingMethod::ONLINE; }
+		else if(method_string == "offline") { power_splitting_method = PowerSplittingMethod::OFFLINE; }
+		else { std::cerr << "Unknown power_splitting_method: " << method_string << std::endl; exit(1); }
 	}
 
 	void setGridParams(int _grid_min_num_pu, int _grid_min_num_ss, int _grid_num_x, int _grid_num_y, float _grid_delta_x, float _grid_delta_y) {
@@ -95,6 +106,8 @@ public:
 
 	SelectionAlgo selection_algo;
 	SecureWriteAlgo secure_write_algo;
+
+	PowerSplittingMethod power_splitting_method;
 
 	bool use_grid;
 	int grid_min_num_pu, grid_min_num_ss;

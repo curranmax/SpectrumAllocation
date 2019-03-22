@@ -94,6 +94,8 @@ class Args {
 	std::string selection_algo;
 	std::string secure_write_algo;
 
+	std::string power_splitting_method; // should be either "offline" or "online".
+
 	// Grid params
 	int grid_num_x, grid_num_y;
 
