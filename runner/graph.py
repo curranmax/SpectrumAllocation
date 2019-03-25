@@ -1,8 +1,11 @@
 
 import argparse
-import matplotlib.pyplot as plt
 from numpy import median
 import math
+
+import matplotlib.pyplot as plt
+import plotly.plotly as py
+import plotly.graph_objs as go
 
 from runner import readInParamResult, runExperiment
 
@@ -109,12 +112,34 @@ def plotCdf(data, title = "", xlabel = "", n_bins = 1000):
 
 	plt.show()
 
-def plotData(data, reduce_function = None, include_errbars = False, scatter_plot = False, title = None, xlabel = None, ylabel = None, print_xy_data = False):
+def getPercentile(vals, percentile):
+	exact_ind = (len(vals) - 1) * percentile
+
+	fi = math.floor(exact_ind)
+	ci = math.ceil(exact_ind)
+
+	lv = vals[int(fi)]
+	lw = ci - exact_ind
+
+	uv = vals[int(ci)]
+	uw = exact_ind - fi
+
+	if ci == fi:
+		return lv
+	else:
+		return lw * lv + uw * uv
+
+def plotData(data, reduce_function = None, errbars = None, scatter_plot = False, title = None, xlabel = None, ylabel = None, print_xy_data = False):
 	handles = []
 	legend_labels = []
+
+	plotly_data = []
 	for group in data:
 		_xvs = [x for x in sorted(data[group])]
 		_yvs = [reduce_function(data[group][xv]) for xv in _xvs]
+
+		for xv in _xvs:
+			data[group][xv].sort()
 
 		if group == (True, True):
 			for xv in _xvs:
@@ -137,16 +162,29 @@ def plotData(data, reduce_function = None, include_errbars = False, scatter_plot
 
 		if scatter_plot:
 			h = plt.scatter(xvs, yvs, alpha = 0.25)
-		elif include_errbars:
-			yerr_low = [yv - min(data[group][xv]) for xv, yv in zip(xvs, yvs)]
-			yerr_high = [max(data[group][xv]) - yv for xv, yv in zip(xvs, yvs)]
+		elif errbars != None:
+			yerr_low = [yv - getPercentile(data[group][xv], errbars[0]) for xv, yv in zip(xvs, yvs)]
+			yerr_high = [getPercentile(data[group][xv], errbars[1]) - yv for xv, yv in zip(xvs, yvs)]
 
 			h, _, _ = plt.errorbar(xvs, yvs, yerr = [yerr_low, yerr_high])
+
+			trace = go.Scatter(
+				x = xvs,
+				y = yvs,
+				error_y = dict(
+					type = 'data',
+					symmetric = False,
+					array = yerr_high,
+					arrayminus = yerr_low
+				)
+			)
 		else:
 			h, = plt.plot(xvs, yvs)
+			trace = go.Scatter(x = xvs, y = yvs)
 
 		handles.append(h)
 		legend_labels.append(str(group))
+		plotly_data.append(trace)
 
 	if title != None:
 		plt.title(title)
@@ -161,6 +199,9 @@ def plotData(data, reduce_function = None, include_errbars = False, scatter_plot
 		plt.legend(handles, legend_labels)
 
 	plt.show()
+
+	if title != None and title != '':
+		py.plot(plotly_data, filename = title)
 
 pos_colors = ['r', 'g', 'b', 'c', 'm', 'y', 'k', '0.5']
 def getColor(k, colors):
@@ -193,6 +234,8 @@ def makeBoxPlot(data, reduce_function = None, include_errbars = False, scatter_p
 
 	x_labels = {}
 	colors = {}
+
+	plotly_data = []
 	for k in sorted(data):
 		x_vals = sorted([xv for xv in data[k] if len(data[k][xv]) > 0])
 		for i, xv in enumerate(x_vals):
@@ -207,6 +250,17 @@ def makeBoxPlot(data, reduce_function = None, include_errbars = False, scatter_p
 		if bp != None:
 			for elem in ('boxes','caps','whiskers', 'fliers', 'medians'):
 				[plt.setp(bp[elem][idx], color = this_color) for idx in range(len(bp[elem]))]
+
+		# Plotly
+
+		py_yvals = [yv for row in y_vals for yv in row]
+		py_xvals = [xv for xv in x_vals for _ in data[k][xv]]
+
+		box = go.Box(
+			x = py_xvals,
+			y = py_yvals
+		)
+		plotly_data.append(box)
 
 	plt.xlabel(xlabel)
 	plt.xlim([.5 - inter_buffer / 2.0, len(x_labels) + .5 + inter_buffer / 2.0])
@@ -227,6 +281,16 @@ def makeBoxPlot(data, reduce_function = None, include_errbars = False, scatter_p
 			h.set_visible(False)
 
 	plt.show()
+
+	layout = go.Layout(
+		boxmode = 'group'
+	)
+
+	fig = go.Figure(data = plotly_data, layout = layout)
+
+	if title != None and title != '':
+		py.plot(fig, filename = title)
+
 
 def tryConvert(val):
 	if val == 'True':
@@ -345,7 +409,9 @@ if __name__ == '__main__':
 	# Y values
 	y_values = [('preprocess_time' ,'ppt'), ('time_per_request', 'tpr'), ('secure_write_time', 'swt'),
 				('percent_diff_secure_vs_plain', 'svp'), ('percent_diff_plain_vs_ground', 'pvg'), ('percent_diff_secure_vs_ground', 'svg'),
-				('db_diff_secure_vs_plain', 'svp_db'), ('db_diff_plain_vs_ground', 'pvg_db'), ('abs_db_diff_plain_vs_ground', 'abs_pvg_db'), ('db_diff_secure_vs_ground', 'svg_db'),
+				('db_diff_secure_vs_plain', 'svp_db'), ('abs_db_diff_secure_vs_plain', 'abs_svp_db'),
+				('db_diff_plain_vs_ground', 'pvg_db'), ('abs_db_diff_plain_vs_ground', 'abs_pvg_db'),
+				('db_diff_secure_vs_ground', 'svg_db'), 
 				('db_diff_plain_vs_unopt', 'pvu_db'), ('db_diff_unopt_vs_ground', 'uvg_db'),
 				('su_pr_path_loss_error', 'pr_ple'), ('su_pr_abs_path_loss_error', 'abs_pr_ple'),
 				('sendEncryptedData', 'sed'), ('recvEncryptedPRThresholds', 'repr'),
@@ -363,7 +429,7 @@ if __name__ == '__main__':
 
 
 	# Group values
-	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'),
+	g_values = x_values + [('unit_type', 'ut'), ('algo_order', 'ao'), ('selection_algo', 'sa'), ('power_splitting_method', 'psm'),
 							('secure_write_algo', 'swa'), ('central_entities', 'ces'),
 							('use_gt_rp_at_ss_from_pu', 'use_gt_rp'), ('use_gt_su_pu_pl', 'use_gt_su_pu_pl'),
 							('propagation_model', 'pm')]
@@ -376,7 +442,9 @@ if __name__ == '__main__':
 		parser.add_argument('-f_' + short_fv, '--use_' + full_fv + '_for_filter_value', metavar = 'FILTER_VALUE', type = str, nargs = '+', default = None , help = 'Only plots points with values of ' + full_gv + ' that match one of the given values.')
 
 	parser.add_argument('-reduce', '--reduce_function', metavar = 'FUNCTION', type = str, nargs = 1, default = ['average'], help = 'Function to reduce multiple functions. Can be (' + ', '.join(rfuncs.keys()) + ')')
-	parser.add_argument('-errbar', '--include_errbars', action = 'store_true', help = 'If given, includes error bars in the graph.')
+
+	parser.add_argument('-errbar', '--include_errbars', metavar = 'PERCENTILE', type = float, nargs = '*', default = None, help = 'Percentile to draw error bars for')
+
 	parser.add_argument('-scatter', '--make_scatter_plot', action = 'store_true', help = 'If given, creates a scatter plot instead of line plot.')
 	parser.add_argument('-box_plot', '--make_box_plot', action = 'store_true', help = 'If given, creates a box plot instead of line plot.')
 	parser.add_argument('-print', '--print_xy_data', action = 'store_true', help = 'If given, prints ALL xy value. Doesn\'t work boxplot.')
@@ -416,6 +484,7 @@ if __name__ == '__main__':
 						'percent_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'percent_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
+						'abs_db_diff_secure_vs_plain': (('su_transmit_power', 'secure'), ('su_transmit_power', 'plain'), 'unit_type'),
 						'db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'abs_db_diff_plain_vs_ground': (('su_transmit_power', 'plain'), ('su_transmit_power', 'ground'), 'unit_type'),
 						'db_diff_secure_vs_ground': (('su_transmit_power', 'secure'), ('su_transmit_power', 'ground'), 'unit_type'),
@@ -428,6 +497,7 @@ if __name__ == '__main__':
 						'percent_diff_plain_vs_ground': percentDifference,
 						'percent_diff_secure_vs_ground': percentDifference,
 						'db_diff_secure_vs_plain': dbDifference,
+						'abs_db_diff_secure_vs_plain': absdbDifference,
 						'db_diff_plain_vs_ground': dbDifference,
 						'abs_db_diff_plain_vs_ground': absdbDifference,
 						'db_diff_secure_vs_ground': dbDifference,
@@ -500,5 +570,18 @@ if __name__ == '__main__':
 		if args.make_box_plot:
 			makeBoxPlot(data, title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value))
 		else:
-			plotData(data, reduce_function = rfuncs[args.reduce_function[0]], include_errbars = args.include_errbars, scatter_plot = args.make_scatter_plot,
+			if args.include_errbars == None:
+				errbars = None
+			elif len(args.include_errbars) == 0:
+				errbars = (0.0, 1.0)
+			elif len(args.include_errbars) == 2:
+				errbars = (min(args.include_errbars), max(args.include_errbars))
+				if errbars[0] > 1.0:
+					errbars[0] = errbars[0] / 100.0
+				if errbars[1] > 1.0:
+					errbars[1] = errbars[1] / 100.0
+			else:
+				raise Exception('Must supply either 0 or 2 percentiles for error bars.')
+
+			plotData(data, reduce_function = rfuncs[args.reduce_function[0]], errbars = errbars, scatter_plot = args.make_scatter_plot,
 					title = args.title[0], xlabel = getXLabel(xv), ylabel = getYLabel(this_y_value), print_xy_data = args.print_xy_data)

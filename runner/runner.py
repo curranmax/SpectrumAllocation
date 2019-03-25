@@ -12,6 +12,7 @@ import time
 
 # Experiments
 TEST = 'test'
+TEST_POWER_SPLITTING_METHOD = 'test_psm'
 
 ALPHA_TEST = 'alpha_test'
 
@@ -36,7 +37,7 @@ OUTPUT_LRG = 'output_lrg'
 
 DENSITY_TEST = 'density'
 
-ALL_EXPERIMENT_IDS = [TEST, ALPHA_TEST,
+ALL_EXPERIMENT_IDS = [TEST, TEST_POWER_SPLITTING_METHOD, ALPHA_TEST,
 						VARY_NUM_SS_SELECT,
 						FULL_TEST_TWO_SMS, FULL_TEST_SM_KS,
 						SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS,
@@ -100,6 +101,8 @@ def makeDefaultExperimentParam():
 
 	param.selection_algo = 'sort'
 	param.secure_write_algo = 'proposed'
+
+	param.power_splitting_method = 'offline'
 
 	param.grid_x = 0
 	param.grid_y = 0
@@ -165,6 +168,8 @@ class ExperimentParam:
 
 		self.selection_algo = None
 		self.secure_write_algo = None
+
+		self.power_splitting_method = None
 
 		self.grid_x = None
 		self.grid_y = None
@@ -357,6 +362,7 @@ def runExperiment(param, no_run = False, debug_print = False):
 			'do_plaintext_split': 'do_pt_split', 'no_pr_thresh_update': 'no_pr_up',
 			'pt_record_split_power': 'rec_sp', 'run_unoptimized_plaintext': 'uo_pt',
 			'selection_algo': 'sel_algo', 'secure_write_algo': 'sec_write_algo',
+			'power_splitting_method': 'power_splitting_method',
 			'grid_x': 'grid_x', 'grid_y': 'grid_y',
 			'ss_receive_power_alpha': 'rpa', 'ss_path_loss_alpha': 'pla',
 			'num_float_bits': 'float_bits', 's2_pc_bit_count': 'bit_count',
@@ -585,6 +591,20 @@ if __name__ == '__main__':
 							'propagation_model': ['longley_rice'],
 							'num_pu': [10], PL_ALPHA: [2], RP_ALPHA: [2], 'location_range': [1000.0], 'num_ss': [500], 'unit_type': ['db'],
 							'num_su': [100]})
+
+		if experiment == TEST_POWER_SPLITTING_METHOD:
+			change = {NUM_SS_SELECTION: [10], 'num_pu_selection': [10], ('s2_pc_bit_count', 'num_float_bits'): [(64, 16)], 'secure_write_algo':['proposed'],
+					('grid_x', 'grid_y'): [(100, 100)], 'selection_algo': ['none'],
+					'num_pr_per_pu' : [5], 'pr_range': [100.0], 'su_buffer': [100.0],
+					('propagation_model', 'in_filename'): [('log_distance', None)],
+					'ld_path_loss0': [50], 'ld_dist0': [20], 'ld_gamma': [3.5],
+					'num_pu': [400], 'num_ss': [40000], 'num_su': [100],
+					PL_ALPHA: [2.0], RP_ALPHA: [3.5], 'pl_est_gamma': [3.5], 'location_range': [10.0 * 1000.0], 'unit_type': ['db'],
+					'central_entities': ['two_sms'],
+					'no_pr_thresh_update': [False], 'do_plaintext_split': [True],
+					'power_splitting_method': ['offline', 'online']}
+
+			changes.append(change)
 
 		if experiment in [FULL_TEST_TWO_SMS, FULL_TEST_SM_KS, SMALL_GRID_TWO_SMS, SMALL_GRID_SM_KS]:
 			num_su = 100
