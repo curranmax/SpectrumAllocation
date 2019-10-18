@@ -2554,17 +2554,19 @@ float PlaintextSpectrumManager::plainTextRadar(
 	std::vector<float> weights;
 	float tmp_sum_weight = 0.0;
 	for(unsigned int x = 0; x < sss_inds.size(); ++x) {
+		// Distance between the SS and the SU
 		float d = sss_dists[x];
 		if (d < 0.0001) {
 			d = 0.0001; 
 		}
 
+		// Weight of this SS with respect to this SU
 		float w = pow(1.0 / d, sm_params->pl_alpha_f);
 		weights.push_back(w);
 		tmp_sum_weight += w;
 	}
-	// exit(1);
 
+	// Debugging code
 	bool read_su_pu_pl = (this_su_pu_pl->size() != 0);
 	if(!read_su_pu_pl) {
 		*this_su_pu_pl = std::vector<float>(pus.size(), 0.0);
@@ -2574,7 +2576,7 @@ float PlaintextSpectrumManager::plainTextRadar(
 	// tp = thresh * sum(w(SS)) / sum(r(SS) / t(PU) * w(SS))
 	P("calc max SU tp");
 	float max_transmit_power = std::numeric_limits<float>::infinity();
-	std::vector<std::vector<float> > estimated_path_loss; // estimated_path_loss[i][j] is the path loss between the su and PU i's PR j.
+	std::vector<std::vector<float> > estimated_path_loss; // estimated_path_loss[i][j] is the path loss between the SU and PU i's PR j.
 	for(unsigned int y = 0; y < pu_inds.size(); ++y) {
 		unsigned int j = pu_inds[y];
 
